@@ -1,0 +1,115 @@
+@font-face {
+    font-family: 'MaplestoryOTFBold';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@2.1/MaplestoryOTFBold.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'MaplestoryOTFBold', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: normal;
+
+  color-scheme: light;
+  color: #333;
+  background-color: #f8f4f0; /* 배경을 부드러운 화이트-베이지로 변경 */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  cursor: none !important; /* 시스템 커서 숨김 */
+}
+
+* {
+  cursor: none !important; /* 모든 요소에서 시스템 커서 숨김 */
+}
+
+#root {
+  width: 100%;
+}
+
+/* === 화이트/베이지 테마 메이플 스타일 UI === */
+
+.maple-panel {
+  background-color: #ffffff; /* 화이트 바탕 */
+  border: 2px solid #dccfc4; /* 베이지색 테두리 */
+  border-radius: 8px;
+  box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.05);
+  color: #5a4b3c;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.maple-panel-header {
+  background: #fdfaf7; /* 아주 연한 베이지 바탕 */
+  border-bottom: 2px solid #eaddcf; /* 헤더 구분선 */
+  color: #5a4b3c;
+  padding: 10px 16px;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.maple-button {
+  background: #ffffff;
+  border: 2px solid #dccfc4;
+  border-radius: 6px;
+  color: #5a4b3c;
+  transition: all 0.1s;
+  box-shadow: 0 3px 0 #dccfc4;
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: 1.1rem;
+}
+
+.maple-button:hover:not(:disabled) {
+  background: #fdfaf7;
+  border-color: #cbbba9;
+  box-shadow: 0 3px 0 #cbbba9;
+}
+
+.maple-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #cbbba9;
+}
+
+.maple-button:disabled {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #aaa;
+  box-shadow: 0 3px 0 #ddd;
+  cursor: not-allowed;
+}
+
+/* 스크롤바 커스텀 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #fdfaf7;
+  border-left: 1px solid #f0e6dc;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #dccfc4;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbbba9;
+}
