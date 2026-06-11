@@ -11,6 +11,7 @@ import CustomCursor from './components/ui/CustomCursor';
 import GameHeader from './components/ui/GameHeader';
 import LobbyView from './features/lobby/LobbyView';
 import RoomView from './features/room/RoomView';
+import LoginView from './features/login/LoginView';
 import { useAppStore } from './store/appStore';
 
 const GameView: React.FC = () => {
@@ -47,6 +48,7 @@ const App: React.FC = () => {
     <div className="h-screen w-screen flex flex-col bg-[#f8f4f0] overflow-hidden">
       <CustomCursor />
       
+      {currentView === 'LOGIN' && <LoginView />}
       {currentView === 'LOBBY' && <LobbyView />}
       {currentView === 'ROOM' && <RoomView />}
       {currentView === 'GAME' && <GameView />}

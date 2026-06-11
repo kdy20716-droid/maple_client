@@ -16,7 +16,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, disab
       onMouseLeave={() => setShowLabel(false)}
       onClick={onClick}
       disabled={disabled}
-      className="relative w-full h-full bg-slate-800 border-2 border-[#5a4b3c] hover:bg-slate-700 transition-colors flex items-center justify-center text-4xl shadow-md disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group"
+      className="relative w-full h-full bg-slate-800 border-2 border-[#5a4b3c] hover:bg-slate-700 transition-colors flex items-center justify-center text-2xl shadow-md disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group"
     >
       <span className="group-hover:scale-110 transition-transform">{icon}</span>
       
@@ -31,7 +31,10 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, disab
 
 const ActionMenuOverlay: React.FC = () => {
   return (
-    <div className="fixed bottom-0 right-0 w-64 h-64 bg-black/80 border-t-4 border-l-4 border-[#333] z-30 p-2 grid grid-cols-3 grid-rows-2 gap-2">
+    <div
+      className="fixed bottom-0 right-0 bg-black/80 border-t-4 border-l-4 border-[#333] z-30 p-2 grid grid-cols-3 grid-rows-2 gap-2"
+      style={{ width: '20vw', height: '20vw', minWidth: '200px', minHeight: '200px' }}
+    >
       <ActionButton icon="🗡️" label="전사 판매" onClick={() => {}} />
       <ActionButton icon="🧙" label="마법사 판매" onClick={() => {}} />
       <ActionButton icon="🏹" label="궁수 판매" onClick={() => {}} />

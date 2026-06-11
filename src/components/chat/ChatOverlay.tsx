@@ -89,7 +89,7 @@ const ChatOverlay: React.FC = () => {
   }, [isChatActive]);
 
   return (
-    <div className="fixed bottom-[270px] left-4 flex flex-col justify-end gap-2 z-[9999] w-96 pointer-events-none">
+    <div className="fixed flex flex-col justify-end gap-2 z-[9999] w-96 pointer-events-none" style={{ bottom: 'calc(20vw + 8px)', left: '4px' }}>
       {/* 채팅 메시지 목록 */}
       <div className="flex flex-col gap-1.5 mb-1">
         {messages.map((msg) => (

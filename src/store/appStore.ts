@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type AppView = 'LOBBY' | 'ROOM' | 'GAME';
+export type AppView = 'LOGIN' | 'LOBBY' | 'ROOM' | 'GAME';
 
 interface AppState {
   currentView: AppView;
@@ -8,6 +8,6 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  currentView: 'LOBBY',
+  currentView: 'LOGIN',
   setView: (view) => set({ currentView: view }),
 }));

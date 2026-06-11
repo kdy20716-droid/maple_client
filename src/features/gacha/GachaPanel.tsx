@@ -37,8 +37,8 @@ const GachaPanel: React.FC = () => {
         position: { x: spawnX, y: spawnY },
       });
 
-      // 전설 이상 등급은 5줄짜리 특별 공지 출력
-      const specialRarities: UnitRarity[] = ['Legendary', 'Epic', 'Mythic', 'Primeval', 'Apocalypse'];
+      // 레전더리 이상 등급은 5줄짜리 특별 공지 출력
+      const specialRarities: UnitRarity[] = ['Legendary', 'Hero', 'Mythic', 'Primeval', 'Apocalypse'];
       
       if (specialRarities.includes(rarity)) {
         const color = RARITY_COLORS[rarity];
