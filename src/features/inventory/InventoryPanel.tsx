@@ -1,6 +1,6 @@
 import React from 'react';
 import { useUnitStore } from '../../store/unitStore';
-import { RARITY_COLORS, RARITY_LABELS } from '../../utils/gachaUtils';
+import { RARITY_LABELS } from '../../utils/gachaUtils';
 import type { UnitRarity } from '../../types/game';
 
 // Tailwind 클래스로 변환하기 힘든 동적 컬러는 인라인 스타일로 처리하거나 매핑을 유지합니다.

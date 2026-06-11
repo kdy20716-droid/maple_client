@@ -32,22 +32,43 @@ export const useEdgePan = (options: EdgePanOptions = {}) => {
       updatePanning(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
     };
 
+    const clampScroll = () => {
+      const minScrollY = 300;
+      const maxScrollY = 3650 - window.innerHeight;
+      if (container.scrollTop < minScrollY) {
+        container.scrollTop = minScrollY;
+      } else if (container.scrollTop > maxScrollY) {
+        container.scrollTop = maxScrollY;
+      }
+    };
+
+    // 초기 Y 스크롤 위치 설정
+    container.scrollTop = 300;
+
     const loop = () => {
       if (container) {
         if (dx !== 0 || dy !== 0) {
           container.scrollLeft += dx;
           container.scrollTop += dy;
         }
+        clampScroll();
         setScrollPos(container.scrollLeft, container.scrollTop);
       }
       requestRef = requestAnimationFrame(loop);
     };
 
+    const handleScroll = () => {
+      clampScroll();
+      setScrollPos(container.scrollLeft, container.scrollTop);
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('scroll', handleScroll);
     requestRef = requestAnimationFrame(loop);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('scroll', handleScroll);
       cancelAnimationFrame(requestRef);
     };
   }, [speed, margin, setScrollPos]);

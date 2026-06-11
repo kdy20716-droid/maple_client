@@ -24,6 +24,8 @@ export interface Unit {
   attackSpeed: number;
   range: number;
   position: Position;
+  isGimmickUnit?: boolean;
+  playerId?: number;
 }
 
 export interface Enemy {

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useUIStore } from '../../store/uiStore';
 
 const CustomCursor: React.FC = () => {
   const [realMouse, setRealMouse] = useState({ x: 0, y: 0 });

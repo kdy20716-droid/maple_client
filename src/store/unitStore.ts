@@ -20,8 +20,4 @@ export const useUnitStore = create<UnitState>((set) => ({
   updateUnitPosition: (id, x, y) => set((state) => ({
     units: state.units.map((u) => u.id === id ? { ...u, position: { x, y } } : u)
   })),
-
-  moveUnit: (id, x, y) => set((state) => ({
-    units: state.units.map((u) => u.id === id ? { ...u, position: { x, y } } : u)
-  })),
 }));

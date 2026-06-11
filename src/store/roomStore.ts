@@ -74,8 +74,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   leaveRoom: () => set({ currentRoom: null }),
 
   toggleSlot: (slotId) => set((state) => {
-    if (!state.currentRoom || slotId === 1) return state; // 1번 방장 슬롯은 변경 불가
-    const newSlots = state.currentRoom.slots.map(slot => {
+    if (!state.currentRoom || slotId === 1) return {}; // 1번 방장 슬롯은 변경 불가
+    const newSlots: RoomSlot[] = state.currentRoom.slots.map(slot => {
       if (slot.id === slotId) {
         if (slot.status === 'PLAYER') return slot; // 플레이어가 있으면 닫지 못하게 방어 (임시)
         return { ...slot, status: slot.status === 'OPEN' ? 'CLOSED' : 'OPEN' };
@@ -86,7 +86,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   }),
 
   setMode: (mode) => set((state) => {
-    if (!state.currentRoom) return state;
+    if (!state.currentRoom) return {};
     return { currentRoom: { ...state.currentRoom, mode } };
   }),
 }));

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useUnitStore } from '../../store/unitStore';
 import { getBaseStats, generateId, RARITY_COLORS, RARITY_LABELS } from '../../utils/gachaUtils';
+import type { UnitRarity } from '../../types/game';
 
 const ChatOverlay: React.FC = () => {
   const { messages, isChatActive, setChatActive, addMessage } = useChatStore();
@@ -33,7 +34,7 @@ const ChatOverlay: React.FC = () => {
                 const requestedRarity = rarityMap[inputRarity];
 
                 if (requestedRarity) {
-                  const unitRarity = requestedRarity as any;
+                  const unitRarity = requestedRarity as UnitRarity;
                   const unitClass = (['Warrior', 'Mage', 'Archer'] as any[])[Math.floor(Math.random() * 3)];
                   const stats = getBaseStats(unitRarity, unitClass);
                   const unitLabel = RARITY_LABELS[unitRarity];

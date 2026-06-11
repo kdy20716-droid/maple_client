@@ -1,35 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUIStore } from '../../../store/uiStore';
 import { useUnitStore } from '../../../store/unitStore';
-import type { UnitRarity } from '../../../types/game';
-
-const rarityColors: Record<UnitRarity, string> = {
-  Normal: 'text-gray-700 border-gray-400 bg-[#e2d2ba]',
-  Rare: 'text-blue-700 border-blue-500 bg-blue-100',
-  Ancient: 'text-purple-700 border-purple-500 bg-purple-100',
-  Hero: 'text-pink-700 border-pink-500 bg-pink-100',
-  Legendary: 'text-orange-600 border-orange-500 bg-orange-100 drop-shadow-[0_0_2px_rgba(255,255,255,1)]',
-  Epic: 'text-cyan-700 border-cyan-500 bg-cyan-100',
-  Mythic: 'text-yellow-700 border-yellow-500 bg-yellow-100',
-  Primeval: 'text-red-700 border-red-500 bg-red-100',
-  Apocalypse: 'text-indigo-900 border-indigo-900 bg-indigo-200 shadow-[0_0_5px_rgba(0,0,0,0.3)]',
-};
-
-const rarityLabels: Record<UnitRarity, string> = {
-  Normal: '일반',
-  Rare: '레어',
-  Ancient: '고대',
-  Hero: '영웅',
-  Legendary: '전설',
-  Epic: '에픽',
-  Mythic: '신화',
-  Primeval: '태초',
-  Apocalypse: '종말',
-};
+import { RARITY_COLORS, RARITY_LABELS } from '../../../utils/gachaUtils';
 
 const InventoryModal: React.FC = () => {
   const { isInventoryModalOpen, setInventoryModalOpen } = useUIStore();
   const { units } = useUnitStore();
+  const [hoverClose, setHoverClose] = useState(false);
+  const [activeClose, setActiveClose] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -44,50 +22,247 @@ const InventoryModal: React.FC = () => {
   if (!isInventoryModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="maple-panel w-[600px] h-[500px] flex flex-col shadow-2xl animate-in zoom-in duration-200">
-        <div className="maple-panel-header">
-          <div className="flex items-center gap-3">
-            <span>🎒 보유 유닛 정보</span>
-            <span className="text-sm bg-black/30 px-3 py-1 rounded-full font-mono">{units.length} / 50</span>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 110,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(2px)',
+        fontFamily: '"Gulim", "Dotum", sans-serif',
+      }}
+    >
+      <div
+        style={{
+          width: '560px',
+          height: '480px',
+          background: 'linear-gradient(160deg, #2c1a0e, #180d07)',
+          border: '3px solid #8b5e2e',
+          borderRadius: '4px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* 모달 헤더 */}
+        <div
+          style={{
+            background: 'linear-gradient(90deg, #50351d, #2d1a0b)',
+            borderBottom: '2px solid #8b5e2e',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#f0d080',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            textShadow: '1px 1px 1px #000',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🎒 INVENTORY</span>
+            <span
+              style={{
+                fontSize: '10px',
+                background: 'rgba(0,0,0,0.4)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                color: '#fff',
+                fontFamily: 'monospace',
+                border: '1px solid #3a2212',
+              }}
+            >
+              {units.length} / 50
+            </span>
           </div>
-          <button onClick={() => setInventoryModalOpen(false)} className="hover:text-red-200 text-xl">✖</button>
+          <button
+            onClick={() => setInventoryModalOpen(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8b5e2e',
+              fontSize: '14px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              outline: 'none',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.color = '#ff6060')}
+            onMouseOut={(e) => (e.currentTarget.style.color = '#8b5e2e')}
+          >
+            ✕
+          </button>
         </div>
-        
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar bg-[#f1e4d1] shadow-inner">
+
+        {/* 인벤토리 격자 바디 영역 */}
+        <div
+          style={{
+            flex: 1,
+            padding: '16px',
+            background: '#0d0804',
+            overflowY: 'auto',
+            boxShadow: 'inset 0 0 16px rgba(0,0,0,0.9)',
+          }}
+          className="custom-scrollbar"
+        >
           {units.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-[#8e6d46] gap-4">
-              <span className="text-6xl opacity-20">empty</span>
-              <span className="font-bold text-xl">보유 중인 유닛이 없습니다.</span>
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#5a3818',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '48px', opacity: 0.3 }}>🍄</span>
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>인벤토리가 비어 있습니다.</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {units.map((unit) => (
-                <div 
-                  key={unit.id} 
-                  className={`p-3 rounded-lg shadow-md border-2 flex flex-col items-center justify-center text-center transition-all hover:scale-105 hover:shadow-lg ${rarityColors[unit.rarity]}`}
-                >
-                  <span className="text-[10px] mb-1 opacity-80 font-bold bg-white/40 px-2 py-0.5 rounded-full border border-black/5">
-                    {rarityLabels[unit.rarity]}
-                  </span>
-                  <div className="text-2xl mb-1">
-                    {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '10px',
+              }}
+            >
+              {units.map((unit) => {
+                const rarityColor = RARITY_COLORS[unit.rarity];
+                return (
+                  <div
+                    key={unit.id}
+                    style={{
+                      background: 'linear-gradient(135deg, #1e120a, #100a05)',
+                      border: `1.5px solid #3c2415`,
+                      borderRadius: '3px',
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      position: 'relative',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = rarityColor;
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#3c2415';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    {/* 상단 뱃지 */}
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        color: rarityColor,
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        padding: '1px 6px',
+                        borderRadius: '2px',
+                        border: `1px solid ${rarityColor}44`,
+                        marginBottom: '8px',
+                        textShadow: `0 0 4px ${rarityColor}88`,
+                      }}
+                    >
+                      {RARITY_LABELS[unit.rarity]}
+                    </span>
+
+                    {/* 유닛 이모지 아이콘 */}
+                    <div
+                      style={{
+                        fontSize: '28px',
+                        marginBottom: '6px',
+                        filter: `drop-shadow(0 0 6px ${rarityColor}44)`,
+                      }}
+                    >
+                      {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
+                    </div>
+
+                    {/* 이름 */}
+                    <span
+                      style={{
+                        color: '#f0d080',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        width: '100%',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      {unit.name}
+                    </span>
+
+                    {/* 공격력 수치 표시 */}
+                    <div
+                      style={{
+                        width: '100%',
+                        borderTop: '1px solid #28180d',
+                        paddingTop: '4px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ fontSize: '8px', color: '#5a3818', textTransform: 'uppercase' }}>ATTACK</span>
+                      <span style={{ fontSize: '11px', color: '#ddccaa', fontWeight: 'bold' }}>
+                        {unit.damage.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                  <span className="font-bold text-sm tracking-tight">{unit.name}</span>
-                  <div className="w-full mt-2 pt-2 border-t border-black/5 flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold text-black/60 uppercase">Power</span>
-                    <span className="text-xs font-black">{unit.damage.toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        <div className="p-4 bg-[#eaddcf] border-t border-[#dccfc4]">
-          <button 
+        {/* 하단 버튼 바 */}
+        <div
+          style={{
+            padding: '12px',
+            background: 'linear-gradient(180deg, #180d07, #0d0804)',
+            borderTop: '2.5px solid #8b5e2e',
+            display: 'flex',
+            justifyContent: 'center',
+          }}
+        >
+          <button
             onClick={() => setInventoryModalOpen(false)}
-            className="maple-button w-full py-2.5 font-bold"
+            onMouseEnter={() => setHoverClose(true)}
+            onMouseLeave={() => {
+              setHoverClose(false);
+              setActiveClose(false);
+            }}
+            onMouseDown={() => setActiveClose(true)}
+            onMouseUp={() => setActiveClose(false)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: hoverClose
+                ? 'linear-gradient(180deg, #c8922a, #8b5e1a)'
+                : 'linear-gradient(180deg, #b07820, #7a4e10)',
+              border: '2px solid #6a3e08',
+              borderRadius: '3px',
+              color: '#fff8e0',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 0 #4a2a04`,
+              transform: activeClose ? 'translateY(2px)' : 'translateY(0)',
+              transition: 'background 0.1s, transform 0.08s',
+              outline: 'none',
+              textAlign: 'center',
+            }}
           >
             닫기 (ESC)
           </button>

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 interface GameState {
   gold: number;
   wave: number;
+  stageTimeLeft: number; // 남은 시간 (초 단위)
   monsterCount: number;
   maxMonsterCount: number;
   killCount: number;
@@ -12,19 +13,27 @@ interface GameState {
     Mage: number;
     Archer: number;
   };
+  gameSpeed: number; // 기본 2배속, 4배속 조절 가능
+  isBgmOff: boolean;
+  isSfxOff: boolean;
   addGold: (amount: number) => void;
   spendGold: (amount: number) => boolean;
   nextWave: () => void;
+  tickStageTime: (amount: number) => void;
   addMonster: () => void;
   removeMonster: () => void;
   recordKill: () => void;
   upgradeClass: (unitClass: 'Warrior' | 'Mage' | 'Archer') => void;
+  setGameSpeed: (speed: number) => void;
+  setBgmOff: (off: boolean) => void;
+  setSfxOff: (off: boolean) => void;
   resetGame: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   gold: 20, 
   wave: 1,
+  stageTimeLeft: 140, // 2분 20초 (140초)
   monsterCount: 0,
   maxMonsterCount: 80,
   killCount: 0,
@@ -34,6 +43,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     Mage: 0,
     Archer: 0,
   },
+  gameSpeed: 2, // 기본 2배속
+  isBgmOff: false,
+  isSfxOff: false,
   
   addGold: (amount) => set((state) => ({ gold: state.gold + amount })),
   
@@ -45,7 +57,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     return false;
   },
   
-  nextWave: () => set((state) => ({ wave: state.wave + 1 })),
+  nextWave: () => set((state) => ({ wave: state.wave + 1, stageTimeLeft: 140 })),
+  
+  tickStageTime: (amount) => {
+    const nextTime = Math.max(0, get().stageTimeLeft - amount);
+    if (nextTime <= 0) {
+      set((state) => ({
+        wave: state.wave + 1,
+        stageTimeLeft: 140
+      }));
+    } else {
+      set({ stageTimeLeft: nextTime });
+    }
+  },
   
   addMonster: () => {
     const nextCount = get().monsterCount + 1;
@@ -79,12 +103,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
+  setGameSpeed: (speed) => set({ gameSpeed: speed }),
+  setBgmOff: (off) => set({ isBgmOff: off }),
+  setSfxOff: (off) => set({ isSfxOff: off }),
+
   resetGame: () => set({
     gold: 20,
     wave: 1,
+    stageTimeLeft: 140,
     monsterCount: 0,
     killCount: 0,
     isGameOver: false,
-    upgrades: { Warrior: 0, Mage: 0, Archer: 0 }
+    upgrades: { Warrior: 0, Mage: 0, Archer: 0 },
+    gameSpeed: 2,
+    isBgmOff: false,
+    isSfxOff: false
   })
 }));
