@@ -22,12 +22,12 @@ export const useChatStore = create<ChatState>((set) => ({
     const id = Math.random().toString(36).substring(2, 9);
     set((state) => ({ messages: [...state.messages, { id, text, color }] }));
     
-    // 3초 후 자동 삭제
+    // 5초 후 자동 삭제
     setTimeout(() => {
       set((state) => ({
         messages: state.messages.filter((m) => m.id !== id)
       }));
-    }, 3000);
+    }, 5000);
   },
   
   removeMessage: (id) => set((state) => ({

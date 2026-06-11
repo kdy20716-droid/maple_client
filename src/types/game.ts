@@ -1,4 +1,13 @@
-export type UnitRarity = 'Normal' | 'Rare' | 'Ancient' | 'Legendary';
+export type UnitRarity = 
+  | 'Normal' 
+  | 'Rare' 
+  | 'Epic' 
+  | 'Unique' 
+  | 'Legendary' 
+  | 'Hero' 
+  | 'Mythic' 
+  | 'Primeval' 
+  | 'Apocalypse';
 export type UnitClass = 'Warrior' | 'Mage' | 'Archer';
 
 export interface Position {

@@ -2,6 +2,20 @@ import React from 'react';
 import { useUIStore } from '../../../store/uiStore';
 import { useUnitStore } from '../../../store/unitStore';
 import { useEnemyStore } from '../../../store/enemyStore';
+import { RARITY_LABELS } from '../../../utils/gachaUtils';
+import type { UnitRarity } from '../../../types/game';
+
+const rarityStyles: Record<UnitRarity, string> = {
+  Normal: 'bg-[#e2d2ba] text-gray-700 border-gray-400',
+  Rare: 'bg-blue-100 text-blue-600 border-blue-500',
+  Epic: 'bg-purple-100 text-purple-600 border-purple-500',
+  Unique: 'bg-pink-100 text-pink-600 border-pink-500',
+  Legendary: 'bg-orange-100 text-orange-600 border-orange-500',
+  Hero: 'bg-cyan-100 text-cyan-600 border-cyan-500',
+  Mythic: 'bg-yellow-100 text-yellow-600 border-yellow-500',
+  Primeval: 'bg-red-100 text-red-600 border-red-500',
+  Apocalypse: 'bg-indigo-200 text-indigo-900 border-indigo-900 shadow-[0_0_10px_rgba(79,70,229,0.5)]',
+};
 
 const UnitInfoOverlay: React.FC = () => {
   const { selectedUnitIds, selectedEnemyId } = useUIStore();
@@ -14,7 +28,6 @@ const UnitInfoOverlay: React.FC = () => {
   if (selectedUnits.length === 0 && !selectedEnemy) return null;
 
   if (selectedEnemy) {
-    // Enemy UI (기존과 동일)
     const hpPercent = (selectedEnemy.hp / selectedEnemy.maxHp) * 100;
     const shieldPercent = (selectedEnemy.shield / selectedEnemy.maxShield) * 100;
 
@@ -64,7 +77,6 @@ const UnitInfoOverlay: React.FC = () => {
     );
   }
 
-  // Multi-Unit UI
   if (selectedUnits.length > 1) {
     return (
       <div className="fixed bottom-0 left-64 right-64 h-64 bg-black/80 border-t-4 border-x-4 border-[#333] z-30 p-6 flex flex-col gap-4">
@@ -75,7 +87,7 @@ const UnitInfoOverlay: React.FC = () => {
               <div className="w-24 h-24 bg-slate-800 border-4 border-[#5a4b3c] rounded-lg flex items-center justify-center text-4xl shadow-inner group-hover:border-yellow-400 transition-colors">
                 {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
               </div>
-              <span className="text-xs text-slate-300 font-bold">{unit.rarity} {unit.class}</span>
+              <span className="text-xs text-slate-300 font-bold">{RARITY_LABELS[unit.rarity]} {unit.class}</span>
             </div>
           ))}
         </div>
@@ -83,7 +95,6 @@ const UnitInfoOverlay: React.FC = () => {
     );
   }
 
-  // Single Unit UI
   const selectedUnit = selectedUnits[0];
   return (
     <div className="fixed bottom-0 left-64 right-64 h-64 bg-black/80 border-t-4 border-x-4 border-[#333] z-30 flex p-6 gap-6">
@@ -94,13 +105,8 @@ const UnitInfoOverlay: React.FC = () => {
       <div className="flex-1 flex flex-col justify-center gap-2">
         <div className="flex items-center gap-3">
           <span className="text-2xl font-bold text-white drop-shadow-md">{selectedUnit.name}</span>
-          <span className={`px-3 py-1 rounded text-sm font-bold border-2 ${
-            selectedUnit.rarity === 'Legendary' ? 'bg-orange-100 text-orange-600 border-orange-500' :
-            selectedUnit.rarity === 'Ancient' ? 'bg-purple-100 text-purple-600 border-purple-500' :
-            selectedUnit.rarity === 'Rare' ? 'bg-blue-100 text-blue-600 border-blue-500' :
-            'bg-[#e2d2ba] text-gray-700 border-gray-400'
-          }`}>
-            {selectedUnit.rarity}
+          <span className={`px-3 py-1 rounded text-sm font-bold border-2 ${rarityStyles[selectedUnit.rarity]}`}>
+            {RARITY_LABELS[selectedUnit.rarity]}
           </span>
         </div>
         

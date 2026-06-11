@@ -5,16 +5,9 @@ import { useEnemyStore } from '../../store/enemyStore';
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import type { UnitRarity, Position, Enemy } from '../../types/game';
+import { generateId, RARITY_COLORS } from '../../utils/gachaUtils';
 import ChatOverlay from '../../components/chat/ChatOverlay';
 import MapControls from './MapControls';
-import { generateId } from '../../utils/gachaUtils';
-
-const unitColors: Record<UnitRarity, string> = {
-  Normal: '#a3a3a3',
-  Rare: '#3b82f6',
-  Ancient: '#9333ea',
-  Legendary: '#f97316',
-};
 
 const MAP_CENTERS = [
   { x: 1000, y: 1000 },
@@ -392,7 +385,7 @@ const BattleField: React.FC = () => {
               transform: 'translate(-50%, -50%)',
               width: '32px',
               height: '32px',
-              backgroundColor: unitColors[unit.rarity],
+              backgroundColor: RARITY_COLORS[unit.rarity],
               zIndex: selectedUnitIds.includes(unit.id) ? 25 : 10
             }}
           >
@@ -439,7 +432,6 @@ const BattleField: React.FC = () => {
         })}
       </div>
       
-      <ChatOverlay />
     </div>
   );
 };

@@ -2,7 +2,8 @@ import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUnitStore } from '../../store/unitStore';
 import { useChatStore } from '../../store/chatStore';
-import { rollGacha, getBaseStats, generateId } from '../../utils/gachaUtils';
+import { rollGacha, getBaseStats, generateId, RARITY_COLORS, RARITY_LABELS } from '../../utils/gachaUtils';
+import type { UnitRarity } from '../../types/game';
 
 interface MapControlsProps {
   x: number;
@@ -22,9 +23,9 @@ const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
     if (spendGold(GACHA_COST)) {
       const { rarity, unitClass } = rollGacha();
       const stats = getBaseStats(rarity, unitClass);
-      const unitName = `${rarity} ${unitClass}`;
+      const unitLabel = RARITY_LABELS[rarity];
+      const unitName = `${unitLabel} ${unitClass}`;
       
-      // 스폰 네모 근처 (1P 기준 x, y는 MAP_CENTERS 값)
       const angle = Math.random() * Math.PI * 2;
       const dist = Math.random() * 40;
       const spawnX = x + Math.cos(angle) * dist;
@@ -42,7 +43,19 @@ const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
       });
 
       if (playerIdx === 0) {
-        addMessage(`[시스템] ${unitName} 획득!`, rarity === 'Legendary' ? '#ea580c' : '#1d3d6b');
+        const specialRarities: UnitRarity[] = ['Legendary', 'Epic', 'Mythic', 'Primeval', 'Apocalypse'];
+        
+        if (specialRarities.includes(rarity)) {
+          const color = RARITY_COLORS[rarity];
+          const sep = '------------------------------------------';
+          addMessage(sep, color);
+          addMessage(`[경축] 상위 등급 유닛이 탄생했습니다!`, color);
+          addMessage(`▶▶ ★ ${unitLabel} ★ ◀◀`, color);
+          addMessage(`( ${unitClass} 클래스 유닛 )`, color);
+          addMessage(sep, color);
+        } else {
+          addMessage(`[시스템] ${unitName} 획득!`, RARITY_COLORS[rarity]);
+        }
       }
     } else {
       if (playerIdx === 0) addMessage(`[경고] 골드가 부족합니다!`, '#dc2626');
@@ -54,7 +67,7 @@ const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
   return (
     <div 
       className="absolute flex flex-col gap-2 z-20"
-      style={{ left: x, top: y - 500, transform: 'translateX(-50%)' }} // 맵이 커져서 위치 조정
+      style={{ left: x, top: y - 500, transform: 'translateX(-50%)' }}
     >
       <div className="flex gap-2 bg-white/90 p-2 rounded-lg border-2 border-[#dccfc4] shadow-lg backdrop-blur-sm">
         <button 

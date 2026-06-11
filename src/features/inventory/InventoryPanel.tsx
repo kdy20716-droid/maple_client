@@ -1,13 +1,20 @@
 import React from 'react';
 import { useUnitStore } from '../../store/unitStore';
+import { RARITY_COLORS, RARITY_LABELS } from '../../utils/gachaUtils';
 import type { UnitRarity } from '../../types/game';
 
-// 베이지색 배경에 어울리는 등급별 텍스트 및 보더 컬러 설정
-const rarityColors: Record<UnitRarity, string> = {
+// Tailwind 클래스로 변환하기 힘든 동적 컬러는 인라인 스타일로 처리하거나 매핑을 유지합니다.
+// 여기서는 기존 Tailwind 매핑 방식을 새로운 등급에 맞춰 업데이트합니다.
+const rarityTailwindStyles: Record<UnitRarity, string> = {
   Normal: 'text-gray-700 border-gray-400 bg-[#e2d2ba]',
   Rare: 'text-blue-700 border-blue-500 bg-blue-100',
-  Ancient: 'text-purple-700 border-purple-500 bg-purple-100',
+  Epic: 'text-purple-700 border-purple-500 bg-purple-100',
+  Unique: 'text-pink-700 border-pink-500 bg-pink-100',
   Legendary: 'text-orange-600 border-orange-500 bg-orange-100 drop-shadow-[0_0_2px_rgba(255,255,255,1)]',
+  Hero: 'text-cyan-700 border-cyan-500 bg-cyan-100',
+  Mythic: 'text-yellow-700 border-yellow-500 bg-yellow-100',
+  Primeval: 'text-red-700 border-red-500 bg-red-100',
+  Apocalypse: 'text-indigo-900 border-indigo-900 bg-indigo-200 shadow-[0_0_5px_rgba(0,0,0,0.3)]',
 };
 
 const InventoryPanel: React.FC = () => {
@@ -30,9 +37,9 @@ const InventoryPanel: React.FC = () => {
             {units.map((unit) => (
               <div 
                 key={unit.id} 
-                className={`p-2 rounded shadow-md border-2 flex flex-col items-center justify-center text-center ${rarityColors[unit.rarity]}`}
+                className={`p-2 rounded shadow-md border-2 flex flex-col items-center justify-center text-center transition-transform hover:scale-105 ${rarityTailwindStyles[unit.rarity]}`}
               >
-                <span className="text-xs mb-1 opacity-80 font-bold bg-white/50 px-1 rounded">{unit.rarity}</span>
+                <span className="text-[10px] mb-1 opacity-80 font-bold bg-white/50 px-1 rounded">{RARITY_LABELS[unit.rarity]}</span>
                 <span className="font-bold text-sm tracking-wide">{unit.name}</span>
                 <span className="text-[11px] font-bold mt-1 bg-black/10 px-2 py-0.5 rounded-full">
                   공격력: {unit.damage}
