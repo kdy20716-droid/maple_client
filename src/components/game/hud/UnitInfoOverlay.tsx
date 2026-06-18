@@ -69,7 +69,7 @@ const UnitInfoOverlay: React.FC = () => {
   /* ── 적 선택 ── */
   if (selectedEnemy) {
     return (
-      <div style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderLeft: '3px solid #880000', borderRight: '3px solid #880000' }}>
+      <div data-no-pan="true" style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderLeft: '3px solid #880000', borderRight: '3px solid #880000' }}>
         {/* 아이콘 */}
         <div style={{ aspectRatio: '1', height: '100%', maxHeight: '100px', background: 'rgba(100,0,0,0.3)', border: '2px solid #880000', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', flexShrink: 0 }}>
           👹
@@ -91,26 +91,43 @@ const UnitInfoOverlay: React.FC = () => {
   /* ── 다중 선택 ── */
   if (selectedUnits.length > 1) {
     return (
-      <div style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', padding: '10px 14px', borderLeft: '3px solid #5a3818', borderRight: '3px solid #5a3818' }}>
+      <div data-no-pan="true" style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', padding: '10px 14px', borderLeft: '3px solid #5a3818', borderRight: '3px solid #5a3818' }}>
         <div style={{ color: '#c8922a', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px', letterSpacing: '1px' }}>
           ✦ 선택된 유닛 ({selectedUnits.length}개)
         </div>
         <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {selectedUnits.map(unit => (
-            <div key={unit.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-              <div style={{
-                width: '52px', height: '52px',
-                background: RARITY_BG[unit.rarity],
-                border: `2px solid ${RARITY_COLORS[unit.rarity]}`,
-                borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px',
-              }}>
-                {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
+          {selectedUnits.map(unit => {
+            let icon = unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹';
+            let label = RARITY_LABELS[unit.rarity];
+            let color = RARITY_COLORS[unit.rarity];
+            let bg = RARITY_BG[unit.rarity];
+            
+            if (unit.isGimmickUnit) {
+              color = '#8e6d46';
+              bg = 'rgba(142,109,70,0.15)';
+              label = '일반';
+              if (unit.id.includes('bgm')) icon = '🎵';
+              else if (unit.id.includes('sfx')) icon = '🔊';
+              else if (unit.id.includes('speed')) icon = '⚡';
+              else if (unit.id.includes('hero')) icon = '🎫';
+            }
+            
+            return (
+              <div key={unit.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <div style={{
+                  width: '52px', height: '52px',
+                  background: bg,
+                  border: `2px solid ${color}`,
+                  borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px',
+                }}>
+                  {icon}
+                </div>
+                <span style={{ color: color, fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {label}
+                </span>
               </div>
-              <span style={{ color: RARITY_COLORS[unit.rarity], fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                {RARITY_LABELS[unit.rarity]}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -118,10 +135,76 @@ const UnitInfoOverlay: React.FC = () => {
 
   /* ── 단일 유닛 ── */
   const unit = selectedUnits[0];
+
+  if (unit.isGimmickUnit) {
+    let gimmickIcon = '🎵';
+    let gimmickDesc = '게임의 배경음악(BGM)을 조절할 수 있는 유닛입니다. 이 유닛을 BGM ON 구역에 놓으면 배경음악이 재생되고, BGM OFF 구역으로 이동시키면 배경음악이 음소거됩니다.';
+    
+    if (unit.id.includes('sfx')) {
+      gimmickIcon = '🔊';
+      gimmickDesc = '게임의 효과음(SFX)을 조절할 수 있는 유닛입니다. 이 유닛을 SFX ON 구역에 놓으면 공격 및 타격 효과음이 재생되고, SFX OFF 구역으로 이동시키면 효과음이 음소거됩니다.';
+    } else if (unit.id.includes('speed')) {
+      gimmickIcon = '⚡';
+      gimmickDesc = '게임의 진행 속도(배속)를 조절하는 투표 유닛입니다. 모든 플레이어의 배속 유닛이 x4 영역에 배치되면 4배속(매우 빠름)으로 작동하며, 하나라도 x2 영역에 있으면 2배속(보통)으로 작동합니다. 실제 게임 및 웨이브 대기 시간도 배속의 영향을 받습니다.';
+    } else if (unit.id.includes('hero')) {
+      gimmickIcon = '🎫';
+      gimmickDesc = '영웅 등급 유닛을 선택하거나 뽑을 수 있는 소모성 티켓 유닛입니다. 이 유닛을 원하는 직업 칸(영웅 전사 ⚔️, 영웅 마법사 🔮, 영웅 궁수 🏹, 또는 확률적인 🎁 랜덤 뽑기)으로 드래그하여 이동시키면 해당 유닛이 즉시 소환되고 선택권 유닛은 소멸합니다.';
+    }
+
+    return (
+      <div data-no-pan="true" style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderLeft: `3px solid #8e6d46`, borderRight: `3px solid #8e6d46` }}>
+        {/* 유닛 아이콘 */}
+        <div style={{
+          aspectRatio: '1', height: '100%', maxHeight: '100px',
+          background: 'rgba(142,109,70,0.15)',
+          border: `2px solid #8e6d46`,
+          borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '36px', flexShrink: 0,
+          boxShadow: `0 0 16px rgba(142,109,70,0.4)`,
+        }}>
+          {gimmickIcon}
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
+          {/* 이름 + 등급 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#f0d080', fontSize: '15px', fontWeight: 'bold', textShadow: '0 0 8px rgba(240,200,80,0.3)' }}>
+              {unit.name}
+            </span>
+            <span style={{
+              padding: '1px 8px', borderRadius: '2px', fontSize: '11px', fontWeight: 'bold',
+              background: 'rgba(142,109,70,0.2)',
+              border: `1px solid #8e6d46`,
+              color: '#f0d080',
+              textShadow: `0 0 6px rgba(142,109,70,0.8)`,
+            }}>
+              일반 유닛
+            </span>
+          </div>
+
+          {/* 설명 */}
+          <div style={{
+            background: 'rgba(0,0,0,0.4)',
+            border: '1px solid #3a2010',
+            borderRadius: '3px',
+            padding: '8px 12px',
+            fontSize: '11px',
+            color: '#dccfc4',
+            lineHeight: '1.4',
+            maxHeight: '70px',
+            overflowY: 'auto',
+          }}>
+            {gimmickDesc}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const rarityColor = RARITY_COLORS[unit.rarity];
 
   return (
-    <div style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderLeft: `3px solid ${rarityColor}44`, borderRight: `3px solid ${rarityColor}44` }}>
+    <div data-no-pan="true" style={{ ...hudPanel, left: '246px', right: 'calc(20vw + 20px)', height: '14vh', minHeight: '140px', display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderLeft: `3px solid ${rarityColor}44`, borderRight: `3px solid ${rarityColor}44` }}>
       {/* 유닛 아이콘 */}
       <div style={{
         aspectRatio: '1', height: '100%', maxHeight: '100px',

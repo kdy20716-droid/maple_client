@@ -30,6 +30,8 @@ interface GameState {
   resetGame: () => void;
 }
 
+let accumulatedTime = 0;
+
 export const useGameStore = create<GameState>((set, get) => ({
   gold: 20, 
   wave: 1,
@@ -57,17 +59,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     return false;
   },
   
-  nextWave: () => set((state) => ({ wave: state.wave + 1, stageTimeLeft: 140 })),
+  nextWave: () => {
+    accumulatedTime = 0;
+    set((state) => ({ wave: state.wave + 1, stageTimeLeft: 140 }));
+  },
   
   tickStageTime: (amount) => {
-    const nextTime = Math.max(0, get().stageTimeLeft - amount);
-    if (nextTime <= 0) {
-      set((state) => ({
-        wave: state.wave + 1,
-        stageTimeLeft: 140
-      }));
-    } else {
-      set({ stageTimeLeft: nextTime });
+    accumulatedTime += amount;
+    if (accumulatedTime >= 1.0) {
+      const secondsPassed = Math.floor(accumulatedTime);
+      accumulatedTime -= secondsPassed;
+      
+      const nextTime = Math.max(0, get().stageTimeLeft - secondsPassed);
+      if (nextTime <= 0) {
+        accumulatedTime = 0;
+        set((state) => ({
+          wave: state.wave + 1,
+          stageTimeLeft: 140
+        }));
+      } else {
+        set({ stageTimeLeft: nextTime });
+      }
     }
   },
   
@@ -107,16 +119,19 @@ export const useGameStore = create<GameState>((set, get) => ({
   setBgmOff: (off) => set({ isBgmOff: off }),
   setSfxOff: (off) => set({ isSfxOff: off }),
 
-  resetGame: () => set({
-    gold: 20,
-    wave: 1,
-    stageTimeLeft: 140,
-    monsterCount: 0,
-    killCount: 0,
-    isGameOver: false,
-    upgrades: { Warrior: 0, Mage: 0, Archer: 0 },
-    gameSpeed: 2,
-    isBgmOff: false,
-    isSfxOff: false
-  })
+  resetGame: () => {
+    accumulatedTime = 0;
+    set({
+      gold: 20,
+      wave: 1,
+      stageTimeLeft: 140,
+      monsterCount: 0,
+      killCount: 0,
+      isGameOver: false,
+      upgrades: { Warrior: 0, Mage: 0, Archer: 0 },
+      gameSpeed: 2,
+      isBgmOff: false,
+      isSfxOff: false
+    });
+  }
 }));

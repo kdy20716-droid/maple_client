@@ -1,4 +1,42 @@
-import type { UnitRarity, UnitClass } from '../types/game';
+import type { UnitRarity, UnitClass, Position } from '../types/game';
+
+export const findSpawnPosition = (
+  centerX: number,
+  centerY: number,
+  existingUnits: { position: Position }[],
+  minDist = 34
+): Position => {
+  let attempts = 0;
+  const maxAttempts = 150;
+  let tx = centerX;
+  let ty = centerY;
+  let angle = 0;
+  let radius = 0;
+
+  while (attempts < maxAttempts) {
+    const isOverlapping = existingUnits.some(u => {
+      if (!u.position) return false;
+      const dx = u.position.x - tx;
+      const dy = u.position.y - ty;
+      return Math.sqrt(dx * dx + dy * dy) < minDist;
+    });
+
+    if (!isOverlapping) {
+      return { x: tx, y: ty };
+    }
+
+    attempts++;
+    angle += 0.5;
+    radius = (attempts / 5) * minDist;
+    tx = centerX + Math.cos(angle) * radius;
+    ty = centerY + Math.sin(angle) * radius;
+  }
+
+  return { 
+    x: centerX + (Math.random() * 20 - 10), 
+    y: centerY + (Math.random() * 20 - 10) 
+  };
+};
 
 export const RARITY_COLORS: Record<UnitRarity, string> = {
   Normal: '#9ca3af',

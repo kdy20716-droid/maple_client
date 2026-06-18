@@ -169,6 +169,7 @@ const ActionMenuOverlay: React.FC = () => {
 
   return (
     <div
+      data-no-pan="true"
       style={{
         position: 'fixed',
         bottom: 0,

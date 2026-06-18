@@ -26,7 +26,7 @@ export const useUIStore = create<UIState>((set) => ({
   isInventoryModalOpen: false,
   scrollPos: { x: 0, y: 0 },
   
-  setSelectedUnitIds: (ids) => set({ selectedUnitIds: ids.slice(0, 10), selectedEnemyId: null }),
+  setSelectedUnitIds: (ids) => set({ selectedUnitIds: ids, selectedEnemyId: null }),
   setSelectedEnemyId: (id) => set({ selectedEnemyId: id, selectedUnitIds: [] }),
   setEscMenuOpen: (open) => set({ isEscMenuOpen: open }),
   setProbModalOpen: (open) => set({ isProbModalOpen: open }),

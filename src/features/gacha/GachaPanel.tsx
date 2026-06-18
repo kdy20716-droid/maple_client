@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUnitStore } from '../../store/unitStore';
 import { useChatStore } from '../../store/chatStore';
-import { rollGacha, getBaseStats, generateId, RARITY_COLORS, RARITY_LABELS } from '../../utils/gachaUtils';
+import { rollGacha, getBaseStats, generateId, RARITY_COLORS, RARITY_LABELS, findSpawnPosition } from '../../utils/gachaUtils';
 import type { UnitRarity } from '../../types/game';
 
 const GACHA_COST = 10;
@@ -77,13 +77,11 @@ const GachaPanel: React.FC = () => {
     const unitLabel = RARITY_LABELS[rarity];
     const unitName = `${unitLabel} ${unitClass}`;
 
-    const radius = units.length < 5 ? 40 : 80;
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * radius;
+    const spawnPos = findSpawnPosition(1000, 1000, units, 34);
     addUnit({
       id: generateId(), name: unitName, rarity, class: unitClass,
       damage: stats.damage, attackSpeed: stats.attackSpeed, range: stats.range,
-      position: { x: 1000 + Math.cos(angle) * dist, y: 1000 + Math.sin(angle) * dist },
+      position: spawnPos,
     });
 
     const special: UnitRarity[] = ['Legendary', 'Hero', 'Mythic', 'Primeval', 'Apocalypse'];

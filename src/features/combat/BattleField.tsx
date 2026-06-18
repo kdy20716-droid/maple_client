@@ -7,7 +7,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useRoomStore } from '../../store/roomStore';
 import { useChatStore } from '../../store/chatStore';
 import type { Position, Enemy, UnitRarity } from '../../types/game';
-import { generateId, RARITY_COLORS, RARITY_LABELS, getBaseStats } from '../../utils/gachaUtils';
+import { generateId, RARITY_COLORS, RARITY_LABELS, getBaseStats, findSpawnPosition } from '../../utils/gachaUtils';
 import MapControls from './MapControls';
 import { getStageConfig } from '../../utils/stageUtils';
 
@@ -113,6 +113,51 @@ interface Projectile {
   startTime: number;
 }
 
+const BattleFieldBackground: React.FC = () => {
+  const wave = useGameStore(state => state.wave);
+  const stageTimeLeft = useGameStore(state => state.stageTimeLeft);
+  
+  const stageInfo = getStageConfig(wave);
+  const nextStageInfo = getStageConfig(wave + 1);
+
+  // 3초 전부터 페이드아웃 시작 (1 ➔ 0)
+  const currentOpacity = stageTimeLeft <= 3 ? Math.max(0, stageTimeLeft / 3) : 1;
+
+  return (
+    <>
+      {/* 다음 스테이지 배경 (맨 뒤에 배치, 3초 전에 로딩 및 렌더링 시작) */}
+      {stageTimeLeft <= 3 && (
+        <div 
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url(${nextStageInfo.image})`,
+            backgroundSize: '2400px auto',
+            backgroundRepeat: 'repeat',
+            zIndex: 0,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+
+      {/* 현재 스테이지 배경 (앞에 덮어씌움, 3초간 서서히 페이드아웃) */}
+      <div 
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url(${stageInfo.image})`,
+          backgroundSize: '2400px auto',
+          backgroundRepeat: 'repeat',
+          zIndex: 0,
+          opacity: currentOpacity,
+          pointerEvents: 'none',
+          transition: stageTimeLeft > 3 ? 'none' : 'opacity 100ms linear'
+        }}
+      />
+    </>
+  );
+};
+
 const BattleField: React.FC = () => {
   const containerRef = useEdgePan({ speed: 25, margin: 150 });
   const { units, addUnit, removeUnit, updateUnitPosition } = useUnitStore();
@@ -127,11 +172,14 @@ const BattleField: React.FC = () => {
   } = useUIStore();
   const { wave, monsterCount, isGameOver, resetGame, isBgmOff } = useGameStore();
   const { currentRoom } = useRoomStore();
-  const stageInfo = getStageConfig(wave);
   
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
+
+  // 마우스 드래그 선택 상태
+  const [dragStart, setDragStart] = useState<Position | null>(null);
+  const [dragEnd, setDragEnd] = useState<Position | null>(null);
+
   const lastSpawnTime = useRef(performance.now());
-  const hasStartedSpawning = useRef(false);
   const lastAttackTimes = useRef<Record<string, number>>({});
   const requestRef = useRef<number | undefined>(undefined);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
@@ -178,8 +226,7 @@ const BattleField: React.FC = () => {
     const unitLabel = RARITY_LABELS[rarity];
     const unitName = `${unitLabel} ${unitClass}`;
 
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * 45;
+    const spawnPos = findSpawnPosition(center.x, center.y, useUnitStore.getState().units, 34);
     
     addUnit({
       id: generateId(),
@@ -189,7 +236,7 @@ const BattleField: React.FC = () => {
       damage: stats.damage,
       attackSpeed: stats.attackSpeed,
       range: stats.range,
-      position: { x: center.x + Math.cos(angle) * dist, y: center.y + Math.sin(angle) * dist },
+      position: spawnPos,
     });
 
     // 선택권 유닛 삭제
@@ -277,6 +324,19 @@ const BattleField: React.FC = () => {
     };
   }, []);
 
+  // 미니맵 클릭이나 외부 스크롤 포지션 변경 시 DOM 컨테이너 스크롤 동기화
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      if (Math.abs(container.scrollLeft - scrollPos.x) > 2) {
+        container.scrollLeft = scrollPos.x;
+      }
+      if (Math.abs(container.scrollTop - scrollPos.y) > 2) {
+        container.scrollTop = scrollPos.y;
+      }
+    }
+  }, [scrollPos]);
+
   // BGM 뮤트 동기화
   useEffect(() => {
     if (bgmRef.current) {
@@ -342,21 +402,25 @@ const BattleField: React.FC = () => {
     // 기본 배속인 2배속일 때 deltaTime * 100, 4배속일 때 deltaTime * 200으로 적 이동 속도 가속화
     updateEnemyPositions(deltaTime * 50 * speedMultiplier, P1_WAYPOINTS);
 
-    if (!hasStartedSpawning.current) {
-      if (time > 10000) {
-        hasStartedSpawning.current = true;
-        lastSpawnTime.current = time;
-      }
+    // 스테이지 별 스폰 대기 설정: 초반(Wave 1)은 20초간 대기, 이후(Wave > 1)는 10초간 대기
+    const gameState = useGameStore.getState();
+    const currentWave = gameState.wave;
+    const currentStageTimeLeft = gameState.stageTimeLeft;
+    const isSpawningAllowed = currentWave === 1 ? currentStageTimeLeft <= 120 : currentStageTimeLeft <= 130;
+
+    if (!isSpawningAllowed) {
+      // 스폰 대기 시간 동안은 소환 시간(lastSpawnTime) 기준점 동기화 유지
+      lastSpawnTime.current = time;
     } else {
       const spawnInterval = 1500 / (speedMultiplier / 2);
       if (time - lastSpawnTime.current > spawnInterval) {
         spawnEnemy({
           id: generateId(),
-          name: `Wave ${wave} Slime`,
-          hp: 30 + wave * 20,
-          maxHp: 30 + wave * 20,
-          shield: wave > 10 ? (wave - 10) * 10 : 0,
-          maxShield: wave > 10 ? (wave - 10) * 10 : 0,
+          name: `Wave ${currentWave} Slime`,
+          hp: 30 + currentWave * 20,
+          maxHp: 30 + currentWave * 20,
+          shield: currentWave > 10 ? (currentWave - 10) * 10 : 0,
+          maxShield: currentWave > 10 ? (currentWave - 10) * 10 : 0,
           speed: 1,
           position: { ...P1_WAYPOINTS[0] },
           reward: 5,
@@ -420,39 +484,111 @@ const BattleField: React.FC = () => {
     return () => cancelAnimationFrame(requestRef.current!);
   }, [units, enemies, wave, isGameOver]);
 
+  // 마우스 드래그 선택 및 업 전역 핸들러
+  useEffect(() => {
+    if (!dragStart) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pos = {
+        x: e.clientX - rect.left + scrollPos.x,
+        y: e.clientY - rect.top + scrollPos.y
+      };
+      setDragEnd(pos);
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (!dragStart || !dragEnd) {
+        setDragStart(null);
+        setDragEnd(null);
+        return;
+      }
+
+      const startX = dragStart.x;
+      const startY = dragStart.y;
+      const endX = dragEnd.x;
+      const endY = dragEnd.y;
+
+      const dx = Math.abs(endX - startX);
+      const dy = Math.abs(endY - startY);
+
+      if (dx < 8 && dy < 8) {
+        // 단일 클릭 처리
+        const pos = dragStart;
+        
+        const clickedUnit = units.find(u => {
+          const udx = u.position.x - pos.x;
+          const udy = u.position.y - pos.y;
+          return Math.sqrt(udx * udx + udy * udy) < 30;
+        });
+
+        if (clickedUnit) {
+          if (clickedUnit.isGimmickUnit && clickedUnit.playerId !== 1) {
+            setDragStart(null);
+            setDragEnd(null);
+            return;
+          }
+          setSelectedUnitIds([clickedUnit.id]);
+          setDragStart(null);
+          setDragEnd(null);
+          return;
+        }
+
+        const clickedEnemy = enemies.find(en => {
+          const edx = en.position.x - pos.x;
+          const edy = en.position.y - pos.y;
+          return Math.sqrt(edx * edx + edy * edy) < 30;
+        });
+
+        if (clickedEnemy) {
+          setSelectedEnemyId(clickedEnemy.id);
+          setDragStart(null);
+          setDragEnd(null);
+          return;
+        }
+
+        handleMapClick();
+      } else {
+        // 다중 드래그 박스 선택 처리
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        const minY = Math.min(startY, endY);
+        const maxY = Math.max(startY, endY);
+
+        const unitsInBox = units.filter(u => {
+          // 기믹 및 설정 유닛들은 다중 드래그 이동 선택에서 제외하여 사용자 편의성 제공
+          if (u.isGimmickUnit) return false;
+          return u.position.x >= minX && u.position.x <= maxX && u.position.y >= minY && u.position.y <= maxY;
+        });
+
+        if (unitsInBox.length > 0) {
+          setSelectedUnitIds(unitsInBox.map(u => u.id));
+        } else {
+          handleMapClick();
+        }
+      }
+
+      setDragStart(null);
+      setDragEnd(null);
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [dragStart, dragEnd, units, enemies, scrollPos, setSelectedUnitIds, setSelectedEnemyId, handleMapClick]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isGameOver) return;
     if (e.button === 0) {
+      // 텍스트 블록 선택 방지
+      e.preventDefault();
       const pos = getMouseWorldPos(e);
-      
-      const clickedUnit = units.find(u => {
-        const dx = u.position.x - pos.x;
-        const dy = u.position.y - pos.y;
-        return Math.sqrt(dx * dx + dy * dy) < 30;
-      });
-
-      if (clickedUnit) {
-        // 내 기믹 유닛이거나 일반 전투 유닛만 선택 가능
-        // 타인의 기믹 유닛(playerId !== 1)은 선택 불가능하게 차단
-        if (clickedUnit.isGimmickUnit && clickedUnit.playerId !== 1) {
-          return;
-        }
-        setSelectedUnitIds([clickedUnit.id]);
-        return;
-      }
-
-      const clickedEnemy = enemies.find(en => {
-        const dx = en.position.x - pos.x;
-        const dy = en.position.y - pos.y;
-        return Math.sqrt(dx * dx + dy * dy) < 30;
-      });
-
-      if (clickedEnemy) {
-        setSelectedEnemyId(clickedEnemy.id);
-        return;
-      }
-
-      handleMapClick();
+      setDragStart(pos);
+      setDragEnd(pos);
     }
   };
 
@@ -578,7 +714,7 @@ const BattleField: React.FC = () => {
         return currentUnit ? { ...currentUnit.position } : { x: targetX, y: targetY };
       };
 
-      let tempUnits = [...units];
+      let tempUnits = [...useUnitStore.getState().units];
       selectedUnitIds.forEach(id => {
         const newPos = findNearestFreePos(pos.x, pos.y, id, tempUnits);
         updateUnitPosition(id, newPos.x, newPos.y);
@@ -600,12 +736,27 @@ const BattleField: React.FC = () => {
     >
       <div 
         className="w-[4000px] h-[4000px] relative"
-        style={{
-          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url(${stageInfo.image})`,
-          backgroundSize: '2400px auto',
-          backgroundRepeat: 'repeat'
-        }}
       >
+        {/* ── 배경 페이드아웃 및 다음 맵 대기 레이어 ── */}
+        <BattleFieldBackground />
+
+        {/* 마우스 드래그 선택 박스 오버레이 */}
+        {dragStart && dragEnd && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${Math.min(dragStart.x, dragEnd.x)}px`,
+              top: `${Math.min(dragStart.y, dragEnd.y)}px`,
+              width: `${Math.abs(dragStart.x - dragEnd.x)}px`,
+              height: `${Math.abs(dragStart.y - dragEnd.y)}px`,
+              border: '1.5px solid #00f0ff',
+              background: 'rgba(0, 240, 255, 0.12)',
+              boxShadow: '0 0 8px rgba(0, 240, 255, 0.4)',
+              pointerEvents: 'none',
+              zIndex: 200
+            }}
+          />
+        )}
         {/* ── [U자형 배치] 기믹 구역 A: BGM Control (X: 1650, Y: 1700) ── */}
         <div 
           style={{
@@ -634,12 +785,7 @@ const BattleField: React.FC = () => {
           </div>
           <div style={{ position: 'absolute', top: '45px', bottom: '45px', left: '50%', width: '2px', borderLeft: '1.5px dashed #dccfc4', transform: 'translateX(-50%)' }} />
 
-          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-around', fontWeight: 'bold', fontSize: '13px', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-            <span style={{ color: '#2a8c14', textShadow: '1px 1px 0 #fff' }}>BGM ON</span>
-            <span style={{ color: '#cc2828', textShadow: '1px 1px 0 #fff' }}>BGM OFF</span>
-          </div>
-          
-          {playerCount > 1 ? (
+          {playerCount > 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%', alignItems: 'center', zIndex: 2 }}>
               {playerSlots.map(slot => {
                 if (slot.id === 1) return null;
@@ -654,10 +800,6 @@ const BattleField: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div style={{ fontSize: '9px', color: '#aaa', textAlign: 'center', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-              유닛을 ON/OFF 칸으로 이동시켜 볼륨을 조절하세요
             </div>
           )}
         </div>
@@ -690,12 +832,9 @@ const BattleField: React.FC = () => {
           </div>
           <div style={{ position: 'absolute', top: '45px', bottom: '45px', left: '50%', width: '2px', borderLeft: '1.5px dashed #dccfc4', transform: 'translateX(-50%)' }} />
 
-          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-around', fontWeight: 'bold', fontSize: '13px', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-            <span style={{ color: '#2a8c14', textShadow: '1px 1px 0 #fff' }}>SFX ON</span>
-            <span style={{ color: '#cc2828', textShadow: '1px 1px 0 #fff' }}>SFX OFF</span>
-          </div>
+          {/* SFX ON/OFF 글씨 제거 */}
           
-          {playerCount > 1 ? (
+          {playerCount > 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%', alignItems: 'center', zIndex: 2 }}>
               {playerSlots.map(slot => {
                 if (slot.id === 1) return null;
@@ -710,10 +849,6 @@ const BattleField: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div style={{ fontSize: '9px', color: '#aaa', textAlign: 'center', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-              유닛을 ON/OFF 칸으로 이동시켜 효과음을 켜고 끄세요
             </div>
           )}
         </div>
@@ -746,12 +881,9 @@ const BattleField: React.FC = () => {
           </div>
           <div style={{ position: 'absolute', top: '45px', bottom: '45px', left: '50%', width: '2px', borderLeft: '1.5px dashed #dccfc4', transform: 'translateX(-50%)' }} />
 
-          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-around', fontWeight: 'bold', fontSize: '13px', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-            <span style={{ color: '#cc2828', textShadow: '1px 1px 0 #fff' }}>x 2 (Normal)</span>
-            <span style={{ color: '#2a66ee', textShadow: '1px 1px 0 #fff' }}>x 4 (Fast)</span>
-          </div>
+          {/* x2/x4 배속 글씨 제거 */}
           
-          {playerCount > 1 ? (
+          {playerCount > 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%', alignItems: 'center', zIndex: 2 }}>
               {playerSlots.map(slot => {
                 if (slot.id === 1) return null;
@@ -766,10 +898,6 @@ const BattleField: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div style={{ fontSize: '9px', color: '#aaa', textAlign: 'center', zIndex: 1, fontFamily: '"Gulim", sans-serif' }}>
-              유닛을 x4 칸에 놓으면 배속 투표에 참여합니다
             </div>
           )}
         </div>
@@ -842,7 +970,6 @@ const BattleField: React.FC = () => {
               boxSizing: 'border-box'
             }}>
               <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#cc3030' }}>⚔️ 영웅 전사</span>
-              <span style={{ fontSize: '9px', color: '#666', lineHeight: '1.3' }}>유닛 이동 시<br/>[영웅 전사]<br/>100% 소환</span>
             </div>
 
             {/* Col 2: Mage */}
@@ -860,7 +987,6 @@ const BattleField: React.FC = () => {
               boxSizing: 'border-box'
             }}>
               <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#8844cc' }}>🔮 영웅 마법사</span>
-              <span style={{ fontSize: '9px', color: '#666', lineHeight: '1.3' }}>유닛 이동 시<br/>[영웅 마법사]<br/>100% 소환</span>
             </div>
 
             {/* Col 3: Archer */}
@@ -878,7 +1004,6 @@ const BattleField: React.FC = () => {
               boxSizing: 'border-box'
             }}>
               <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#229944' }}>🏹 영웅 궁수</span>
-              <span style={{ fontSize: '9px', color: '#666', lineHeight: '1.3' }}>유닛 이동 시<br/>[영웅 궁수]<br/>100% 소환</span>
             </div>
 
             {/* Col 4: Random */}
@@ -895,7 +1020,6 @@ const BattleField: React.FC = () => {
               boxSizing: 'border-box'
             }}>
               <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#b07820' }}>🎁 랜덤 뽑기</span>
-              <span style={{ fontSize: '9px', color: '#666', lineHeight: '1.3' }}>유닛 이동 시<br/>[영웅~종말]<br/>확률 소환</span>
             </div>
 
             {/* ── ROW 2: Combined Summon & Waiting Slot (Y >= 2300, No vertical dividers) ── */}
@@ -922,24 +1046,23 @@ const BattleField: React.FC = () => {
                 pointerEvents: 'none'
               }} />
               <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#2b6cb0', zIndex: 1, letterSpacing: '1.5px' }}>🎫 영웅 선택권 소환 및 대기 구역</span>
-              <span style={{ fontSize: '9px', color: '#718096', zIndex: 1, marginTop: '4px' }}>소환된 유닛을 드래그하여 상단 원하는 직업 칸으로 이동시키세요 (소모성)</span>
             </div>
           </div>
 
           {/* Bottom Overlay for Controls / Instructions */}
-          <div style={{
-            position: 'absolute',
-            bottom: '6px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 4,
-            pointerEvents: 'auto',
-            background: 'rgba(248, 244, 240, 0.85)',
-            padding: '2px 10px',
-            borderRadius: '4px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            {playerCount > 1 ? (
+          {playerCount > 1 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '6px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 4,
+              pointerEvents: 'auto',
+              background: 'rgba(248, 244, 240, 0.85)',
+              padding: '2px 10px',
+              borderRadius: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            }}>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '9px', color: '#555' }}>
                 {playerSlots.map(slot => {
                   if (slot.id === 1) return null;
@@ -962,12 +1085,8 @@ const BattleField: React.FC = () => {
                   );
                 })}
               </div>
-            ) : (
-              <div style={{ fontSize: '9px', color: '#777', textAlign: 'center', fontStyle: 'italic', fontFamily: '"Gulim", sans-serif' }}>
-                🎫 영웅 선택권 유닛을 드래그해서 상단 옵션 칸(⚔️/🔮/🏹/🎁)에 배치하세요!
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {MAP_CENTERS.map((center, idx) => (
@@ -999,15 +1118,38 @@ const BattleField: React.FC = () => {
                 zIndex: 2
               }}
             >
-              {idx === 0 && (
-                <div 
-                  className="w-[120px] h-[120px] border-4 border-dashed border-[#dccfc4] rounded-xl flex items-center justify-center bg-white/30"
+              <div 
+                className="w-[120px] h-[120px] border-4 border-dashed rounded-xl flex flex-col items-center justify-center bg-white/30 pointer-events-none"
+                style={{
+                  borderColor: idx === 0 ? '#ff3333' : idx === 1 ? '#3388ff' : idx === 2 ? '#55ff55' : '#cc55ff',
+                }}
+              >
+                <span 
+                  className="text-lg font-black uppercase tracking-wider"
+                  style={{
+                    color: idx === 0 ? '#ff3333' : idx === 1 ? '#3388ff' : idx === 2 ? '#55ff55' : '#cc55ff',
+                  }}
                 >
-                  <span className="text-[10px] font-bold text-[#8e6d46] opacity-40 uppercase">Spawn</span>
-                </div>
-              )}
-              <span className="absolute bottom-10 text-[#cbbba9] font-bold text-5xl opacity-10 uppercase tracking-widest pointer-events-none">
-                Player {idx + 1}
+                  P{idx + 1}
+                </span>
+                <span 
+                  className="text-[9px] font-bold uppercase tracking-wider opacity-60"
+                  style={{
+                    color: idx === 0 ? '#ff3333' : idx === 1 ? '#3388ff' : idx === 2 ? '#55ff55' : '#cc55ff',
+                  }}
+                >
+                  Spawn
+                </span>
+              </div>
+              <span 
+                className="absolute bottom-10 font-bold text-6xl opacity-15 uppercase tracking-widest pointer-events-none"
+                style={{
+                  color: idx === 0 ? '#ff3333' : idx === 1 ? '#3388ff' : idx === 2 ? '#55ff55' : '#cc55ff',
+                  fontFamily: '"Gulim", sans-serif',
+                  textShadow: '0 0 10px rgba(0,0,0,0.1)'
+                }}
+              >
+                P{idx + 1}
               </span>
             </div>
           </React.Fragment>
@@ -1062,15 +1204,11 @@ const BattleField: React.FC = () => {
           const isSelected = selectedUnitIds.includes(unit.id);
           const isGimmick = unit.isGimmickUnit;
           
-          // 플레이어별 기믹 유닛 이모지 매핑
-          let gimmickEmoji = '🟢'; // Default P1 Slime
-          if (unit.playerId === 2) gimmickEmoji = '🍄'; // P2 Mushroom
-          else if (unit.playerId === 3) gimmickEmoji = '🐌'; // P3 Snail
-          else if (unit.playerId === 4) gimmickEmoji = '🐷'; // P4 Ribbon Pig
-
-          if (unit.id.includes('hero')) {
-            gimmickEmoji = '🎫';
-          }
+          // 기능 직관성을 위한 기믹 유닛 이모지 매핑
+          let gimmickEmoji = '🎵'; // Default BGM
+          if (unit.id.includes('sfx')) gimmickEmoji = '🔊';
+          else if (unit.id.includes('speed')) gimmickEmoji = '⚡';
+          else if (unit.id.includes('hero')) gimmickEmoji = '🎫';
 
           return (
             <div
@@ -1085,7 +1223,7 @@ const BattleField: React.FC = () => {
                 width: '32px',
                 height: '32px',
                 backgroundColor: isGimmick ? '#f8f4f0' : RARITY_COLORS[unit.rarity],
-                borderColor: isGimmick ? '#8e6d46' : 'black',
+                borderColor: isGimmick ? (unit.playerId === 1 ? '#ff3333' : unit.playerId === 2 ? '#3388ff' : unit.playerId === 3 ? '#55ff55' : '#cc55ff') : 'black',
                 zIndex: isSelected ? 25 : 10
               }}
             >
@@ -1093,13 +1231,20 @@ const BattleField: React.FC = () => {
                 {isGimmick ? gimmickEmoji : (unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹')}
               </span>
               
-              {/* 기믹 옵션 설정 유닛 아래에 이름표 표시 */}
+              {/* 플레이어 식별 꼬마 배지 (우측 상단) */}
               {isGimmick && (
                 <div 
-                  className="absolute top-10 bg-black/80 text-[#f0d080] border border-[#8b5e2e] text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap z-[100] font-bold pointer-events-none"
-                  style={{ transform: 'translateX(0)' }}
+                  className="absolute -top-1.5 -right-1.5 text-[8px] font-black text-white rounded-full flex items-center justify-center pointer-events-none border border-white"
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    backgroundColor: unit.playerId === 1 ? '#ff3333' : unit.playerId === 2 ? '#3388ff' : unit.playerId === 3 ? '#55ff55' : '#cc55ff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                    transform: 'scale(0.85)',
+                    lineHeight: '14px'
+                  }}
                 >
-                  {unit.name}
+                  P{unit.playerId}
                 </div>
               )}
 

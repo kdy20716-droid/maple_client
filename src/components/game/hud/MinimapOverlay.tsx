@@ -49,6 +49,7 @@ const MinimapOverlay: React.FC = () => {
 
   return (
     <div
+      data-no-pan="true"
       style={{
         position: 'fixed',
         bottom: '10px',
@@ -128,6 +129,7 @@ const MinimapOverlay: React.FC = () => {
               transform: 'translate(-50%, -50%)',
               borderRadius: '2px',
               boxShadow: '0 0 5px rgba(0,250,100,0.1)',
+              pointerEvents: 'none',
             }}
           />
         ))}
@@ -150,6 +152,7 @@ const MinimapOverlay: React.FC = () => {
                 transform: 'translate(-50%, -50%)',
                 zIndex: 5,
                 boxShadow: '0 0 4px #55ff55',
+                pointerEvents: 'none',
               }}
             />
           );
@@ -173,6 +176,7 @@ const MinimapOverlay: React.FC = () => {
                 transform: 'translate(-50%, -50%)',
                 zIndex: 4,
                 boxShadow: '0 0 4px #ff3333',
+                pointerEvents: 'none',
               }}
             />
           );

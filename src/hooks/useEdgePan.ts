@@ -29,6 +29,12 @@ export const useEdgePan = (options: EdgePanOptions = {}) => {
     };
 
     const handleMouseMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-no-pan="true"]')) {
+        dx = 0;
+        dy = 0;
+        return;
+      }
       updatePanning(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
     };
 
@@ -51,8 +57,6 @@ export const useEdgePan = (options: EdgePanOptions = {}) => {
           container.scrollLeft += dx;
           container.scrollTop += dy;
         }
-        clampScroll();
-        setScrollPos(container.scrollLeft, container.scrollTop);
       }
       requestRef = requestAnimationFrame(loop);
     };

@@ -9,13 +9,20 @@ const GameHeader: React.FC = () => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}분 ${secs}초`;
+    const padMins = String(mins).padStart(2, '0');
+    const padSecs = String(secs).padStart(2, '0');
+    return `${padMins}:${padSecs}`;
   };
 
   const danger = monsterCount >= 70;
 
+  // 스폰 대기 시간 계산
+  const isSpawnWait = wave === 1 ? stageTimeLeft > 120 : stageTimeLeft > 130;
+  const waitTimeLeft = wave === 1 ? stageTimeLeft - 120 : stageTimeLeft - 130;
+
   return (
     <header
+      data-no-pan="true"
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0,
@@ -76,19 +83,29 @@ const GameHeader: React.FC = () => {
         {/* 세로 구분선 */}
         <div style={{ width: '1px', height: '16px', background: '#8b5e2e', opacity: 0.6 }} />
 
-        {/* 남은 시간 */}
+        {/* 대기 시간 / 남은 시간 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ color: '#cbbba9', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>남은 시간</span>
           <span style={{ 
-            color: stageTimeLeft < 30 ? '#ff4444' : '#ffcc00', 
+            color: isSpawnWait ? '#ffd700' : '#cbbba9', 
+            fontSize: '10px', 
+            fontWeight: 'bold', 
+            letterSpacing: '0.5px',
+            textShadow: isSpawnWait ? '0 0 6px rgba(255,215,0,0.3)' : 'none'
+          }}>
+            {isSpawnWait ? '대기 시간' : '남은 시간'}
+          </span>
+          <span style={{ 
+            color: isSpawnWait ? '#ffb000' : (stageTimeLeft < 30 ? '#ff4444' : '#ffcc00'), 
             fontSize: '13px', 
             fontWeight: 'bold', 
-            textShadow: stageTimeLeft < 30 ? '0 0 8px rgba(255,68,68,0.6)' : '0 0 6px rgba(255,204,0,0.4)',
+            textShadow: isSpawnWait 
+              ? '0 0 8px rgba(255,176,0,0.5)' 
+              : (stageTimeLeft < 30 ? '0 0 8px rgba(255,68,68,0.6)' : '0 0 6px rgba(255,204,0,0.4)'),
             fontFamily: '"Gulim", sans-serif',
             minWidth: '60px',
             textAlign: 'center'
           }}>
-            {formatTime(stageTimeLeft)}
+            {isSpawnWait ? `${Math.ceil(waitTimeLeft)}초` : formatTime(stageTimeLeft)}
           </span>
         </div>
       </div>

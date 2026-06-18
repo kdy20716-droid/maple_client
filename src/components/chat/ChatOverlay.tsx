@@ -114,7 +114,7 @@ const ChatOverlay: React.FC = () => {
 
       {/* 채팅 입력창 */}
       <div className={`transition-all duration-150 ${isChatActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none h-0'}`}>
-        <div className="flex items-center w-full bg-[#111111]/95 border-2 border-[#8e6d46] rounded-sm shadow-2xl overflow-hidden pointer-events-auto">
+        <div data-no-pan="true" className="flex items-center w-full bg-[#111111]/95 border-2 border-[#8e6d46] rounded-sm shadow-2xl overflow-hidden pointer-events-auto">
           <span className="bg-[#8e6d46] px-3 py-2 text-white font-bold border-r-2 border-[#8e6d46] text-xs">CHAT</span>
           <input 
             ref={inputRef}

@@ -11,7 +11,12 @@ interface UnitState {
 export const useUnitStore = create<UnitState>((set) => ({
   units: [],
   
-  addUnit: (unit) => set((state) => ({ units: [...state.units, unit] })),
+  addUnit: (unit) => set((state) => {
+    if (state.units.some((u) => u.id === unit.id)) {
+      return state;
+    }
+    return { units: [...state.units, unit] };
+  }),
   
   removeUnit: (id) => set((state) => ({ 
     units: state.units.filter((u) => u.id !== id) 
