@@ -4,30 +4,18 @@ import { useUnitStore } from '../../../store/unitStore';
 import { useGameStore } from '../../../store/gameStore';
 import { useChatStore } from '../../../store/chatStore';
 import type { UnitRarity, UnitClass } from '../../../types/game';
-
-/* ── 등급별 판매 가격 ── */
-const RARITY_SELL_PRICES: Record<UnitRarity, number> = {
-  Normal: 1,
-  Rare: 2,
-  Epic: 4,
-  Unique: 8,
-  Legendary: 15,
-  Hero: 25,
-  Mythic: 60,
-  Primeval: 150,
-  Apocalypse: 500,
-};
+import { getBaseStats, generateId, RARITY_LABELS, RARITY_COLORS, getUnitSellValue } from '../../../utils/gachaUtils';
 
 interface ActionButtonProps {
   icon: string;
   label: string;
   count: number;
-  goldValue: number;
+  mineralValue: number;
   onClick: () => void;
   disabled?: boolean;
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, count, goldValue, onClick, disabled }) => {
+const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, count, mineralValue, onClick, disabled }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
   const finalDisabled = disabled || count === 0;
@@ -56,7 +44,6 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, count, goldVal
         position: 'relative',
         boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.08), 0 2px 4px rgba(0,0,0,0.5)',
       }}
-      // 인라인 호버 효과 대체용 이벤트 핸들러
       onMouseOver={(e) => {
         if (!finalDisabled) {
           e.currentTarget.style.border = '2px solid #ffcc00';
@@ -106,7 +93,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, count, goldVal
             <>
               <div style={{ height: '1px', background: '#5a3c24', margin: '3px 0' }} />
               <div style={{ fontSize: '10px', color: '#ddccaa' }}>
-                판매 시 획득 골드: <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>{goldValue} G</span>
+                판매 시 획득 미네랄: <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{mineralValue} M</span>
               </div>
               <div style={{ fontSize: '9px', color: '#888' }}>클릭 시 즉시 판매됩니다.</div>
             </>
@@ -124,35 +111,35 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, count, goldVal
 const ActionMenuOverlay: React.FC = () => {
   const { selectedUnitIds, setSelectedUnitIds } = useUIStore();
   const { units, removeUnit } = useUnitStore();
-  const { addGold } = useGameStore();
+  const { addMineral } = useGameStore();
   const { addMessage } = useChatStore();
 
   // 선택된 유닛들 정보 필터링 (기믹 옵션 유닛 제외)
   const selectedUnits = units.filter((u) => selectedUnitIds.includes(u.id) && !u.isGimmickUnit);
 
   // 직업별 유닛 분류
-  const warriorUnits = selectedUnits.filter((u) => u.class === 'Warrior');
-  const mageUnits = selectedUnits.filter((u) => u.class === 'Mage');
-  const archerUnits = selectedUnits.filter((u) => u.class === 'Archer');
+  const ghostUnits = selectedUnits.filter((u) => u.class === 'Ghost');
+  const dragoonUnits = selectedUnits.filter((u) => u.class === 'Dragoon');
+  const hydraUnits = selectedUnits.filter((u) => u.class === 'Hydra');
 
-  // 직업별 판매 획득 총 골드 계산
-  const getGoldValue = (targetUnits: typeof units) => {
-    return targetUnits.reduce((sum, u) => sum + (RARITY_SELL_PRICES[u.rarity] || 1), 0);
+  // 직업별 판매 획득 총 미네랄 계산 (공식 메운디 판매가 적용)
+  const getMineralValue = (targetUnits: typeof units) => {
+    return targetUnits.reduce((sum, u) => sum + getUnitSellValue(u.rarity), 0);
   };
 
-  const warriorGold = getGoldValue(warriorUnits);
-  const mageGold = getGoldValue(mageUnits);
-  const archerGold = getGoldValue(archerUnits);
+  const ghostMineral = getMineralValue(ghostUnits);
+  const dragoonMineral = getMineralValue(dragoonUnits);
+  const hydraMineral = getMineralValue(hydraUnits);
 
   // 판매 처리 로직
-  const handleSell = (unitClass: UnitClass, targetUnits: typeof units, goldEarned: number) => {
+  const handleSell = (unitClass: UnitClass, targetUnits: typeof units, mineralEarned: number) => {
     if (targetUnits.length === 0) return;
 
     // 1. 유닛 제거
     targetUnits.forEach((u) => removeUnit(u.id));
 
-    // 2. 골드 획득
-    addGold(goldEarned);
+    // 2. 미네랄 획득
+    addMineral(mineralEarned);
 
     // 3. 선택 목록 갱신 (제거된 유닛들을 선택 해제)
     const soldIds = targetUnits.map((u) => u.id);
@@ -160,12 +147,76 @@ const ActionMenuOverlay: React.FC = () => {
     setSelectedUnitIds(nextSelected);
 
     // 4. 알림 시스템 메시지 출력
-    const classKor = unitClass === 'Warrior' ? '전사' : unitClass === 'Mage' ? '마법사' : '궁수';
+    const classKor = unitClass === 'Ghost' ? '고스트' : unitClass === 'Dragoon' ? '드라군' : '히드라';
     addMessage(
-      `[시스템] ${classKor} ${targetUnits.length}마리를 판매하여 ${goldEarned}골드를 획득하였습니다.`,
-      '#55ff55'
+      `[시스템] ${classKor} ${targetUnits.length}마리를 판매하여 ${mineralEarned} 미네랄을 획득하였습니다.`,
+      '#38bdf8'
     );
   };
+
+  // 유닛 합성(Combine) 가능 여부 체크
+  // 선택된 유닛 중 같은 등급 3기 이상인 그룹 찾기
+  const rarityCounts: Partial<Record<UnitRarity, typeof selectedUnits>> = {};
+  selectedUnits.forEach(u => {
+    if (!rarityCounts[u.rarity]) rarityCounts[u.rarity] = [];
+    rarityCounts[u.rarity]!.push(u);
+  });
+
+  const combinableRarity = (Object.keys(rarityCounts) as UnitRarity[]).find(
+    r => r !== 'Primeval' && (rarityCounts[r]?.length || 0) >= 3
+  );
+
+  const combinableUnits = combinableRarity ? rarityCounts[combinableRarity]!.slice(0, 3) : [];
+
+  const handleCombine = () => {
+    if (!combinableRarity || combinableUnits.length < 3) return;
+
+    const NEXT_RARITY: Record<UnitRarity, UnitRarity> = {
+      Common: 'Rare',
+      Rare: 'Ancient',
+      Ancient: 'Artifact',
+      Artifact: 'Narrative',
+      Narrative: 'Legendary',
+      Legendary: 'Epic',
+      Epic: 'Mythic',
+      Mythic: 'Primeval',
+      Primeval: 'Primeval',
+    };
+
+    const nextRarity = NEXT_RARITY[combinableRarity];
+    const baseUnit = combinableUnits[0];
+    const spawnPos = { ...baseUnit.position };
+
+    // 1. 재료 3기 제거
+    combinableUnits.forEach(u => removeUnit(u.id));
+
+    // 2. 상위 1기 생성
+    const stats = getBaseStats(nextRarity, baseUnit.class);
+    const unitClassName = baseUnit.class === 'Ghost' ? '고스트' : baseUnit.class === 'Dragoon' ? '드라군' : '히드라';
+    const newName = `${RARITY_LABELS[nextRarity]} ${unitClassName}`;
+
+    useUnitStore.getState().addUnit({
+      id: generateId(),
+      name: newName,
+      rarity: nextRarity,
+      class: baseUnit.class,
+      attackType: stats.attackType,
+      damage: stats.damage,
+      attackSpeed: stats.attackSpeed,
+      range: stats.range,
+      position: spawnPos,
+    });
+
+    // 3. 선택 목록 갱신
+    const removedIds = combinableUnits.map(u => u.id);
+    setSelectedUnitIds(selectedUnitIds.filter(id => !removedIds.includes(id)));
+
+    // 4. 알림 메시지
+    const color = RARITY_COLORS[nextRarity];
+    addMessage(`[합성 성공] ${RARITY_LABELS[combinableRarity]} 3기를 합성하여 [★ ${newName} ★]을(를) 획득했습니다!`, color);
+  };
+
+  const { setGachaModalOpen, setUpgradeModalOpen } = useUIStore();
 
   return (
     <div
@@ -177,7 +228,7 @@ const ActionMenuOverlay: React.FC = () => {
         zIndex: 30,
         width: '20vw',
         height: '20vw',
-        minWidth: '200px',
+        minWidth: '220px',
         minHeight: '200px',
         maxHeight: '220px',
         background: 'linear-gradient(160deg, #1a0e06, #120a04)',
@@ -193,30 +244,49 @@ const ActionMenuOverlay: React.FC = () => {
       }}
     >
       <ActionButton
-        icon="🗡️"
-        label="전사 판매"
-        count={warriorUnits.length}
-        goldValue={warriorGold}
-        onClick={() => handleSell('Warrior', warriorUnits, warriorGold)}
+        icon="👻"
+        label="고스트 판매"
+        count={ghostUnits.length}
+        mineralValue={ghostMineral}
+        onClick={() => handleSell('Ghost', ghostUnits, ghostMineral)}
       />
       <ActionButton
-        icon="🧙"
-        label="마법사 판매"
-        count={mageUnits.length}
-        goldValue={mageGold}
-        onClick={() => handleSell('Mage', mageUnits, mageGold)}
+        icon="🤖"
+        label="드라군 판매"
+        count={dragoonUnits.length}
+        mineralValue={dragoonMineral}
+        onClick={() => handleSell('Dragoon', dragoonUnits, dragoonMineral)}
       />
       <ActionButton
-        icon="🏹"
-        label="궁수 판매"
-        count={archerUnits.length}
-        goldValue={archerGold}
-        onClick={() => handleSell('Archer', archerUnits, archerGold)}
+        icon="🦎"
+        label="히드라 판매"
+        count={hydraUnits.length}
+        mineralValue={hydraMineral}
+        onClick={() => handleSell('Hydra', hydraUnits, hydraMineral)}
       />
 
-      <ActionButton icon="📜" label="도감 등록" count={0} goldValue={0} onClick={() => {}} disabled />
-      <ActionButton icon="💎" label="전설 교환" count={0} goldValue={0} onClick={() => {}} disabled />
-      <ActionButton icon="🔥" label="신화 구현" count={0} goldValue={0} onClick={() => {}} disabled />
+      <ActionButton
+        icon="✨"
+        label="유닛 합성"
+        count={combinableUnits.length}
+        mineralValue={0}
+        onClick={handleCombine}
+        disabled={combinableUnits.length < 3}
+      />
+      <ActionButton
+        icon="💎"
+        label="유닛 뽑기 (G)"
+        count={1}
+        mineralValue={0}
+        onClick={() => setGachaModalOpen(true)}
+      />
+      <ActionButton
+        icon="🟢"
+        label="직업 강화 (U)"
+        count={1}
+        mineralValue={0}
+        onClick={() => setUpgradeModalOpen(true)}
+      />
     </div>
   );
 };

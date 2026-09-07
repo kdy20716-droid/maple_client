@@ -16,15 +16,15 @@ const hudPanel: React.CSSProperties = {
 
 /* ── 등급 색상 (어두운 배경에서 보이는) ── */
 const RARITY_BG: Record<UnitRarity, string> = {
-  Normal:     'rgba(156,163,175,0.15)',
+  Common:     'rgba(156,163,175,0.15)',
   Rare:       'rgba(96,165,250,0.15)',
-  Epic:       'rgba(192,132,252,0.15)',
-  Unique:     'rgba(244,114,182,0.15)',
+  Ancient:    'rgba(74,222,128,0.15)',
+  Artifact:   'rgba(244,114,182,0.15)',
+  Narrative:  'rgba(192,132,252,0.15)',
   Legendary:  'rgba(251,146,60,0.2)',
-  Hero:       'rgba(34,211,238,0.15)',
+  Epic:       'rgba(239,68,68,0.2)',
   Mythic:     'rgba(251,191,36,0.2)',
-  Primeval:   'rgba(248,113,113,0.2)',
-  Apocalypse: 'rgba(165,180,252,0.2)',
+  Primeval:   'rgba(56,189,248,0.2)',
 };
 
 /* ── 스탯 칸 ── */
@@ -75,9 +75,32 @@ const UnitInfoOverlay: React.FC = () => {
           👹
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: '#ff6060', fontSize: '16px', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,80,80,0.5)' }}>{selectedEnemy.name}</span>
-            <span style={{ color: '#5a3818', fontSize: '11px', marginLeft: '10px' }}>Enemy Unit</span>
+            <span style={{
+              padding: '1px 6px',
+              borderRadius: '2px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              background: selectedEnemy.size === 'Small' ? 'rgba(59,130,246,0.3)' : selectedEnemy.size === 'Medium' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)',
+              border: `1px solid ${selectedEnemy.size === 'Small' ? '#3b82f6' : selectedEnemy.size === 'Medium' ? '#f59e0b' : '#ef4444'}`,
+              color: '#fff',
+            }}>
+              {selectedEnemy.size === 'Small' ? '소형 몬스터' : selectedEnemy.size === 'Medium' ? '중형 몬스터' : '대형 몬스터'}
+            </span>
+            {selectedEnemy.armor > 0 && (
+              <span style={{
+                padding: '1px 6px',
+                borderRadius: '2px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                background: 'rgba(100,100,100,0.3)',
+                border: '1px solid #888',
+                color: '#ddd',
+              }}>
+                방어력 {selectedEnemy.armor}
+              </span>
+            )}
           </div>
           <HpBar label="HP" current={selectedEnemy.hp} max={selectedEnemy.maxHp} color="#ff4444" bg="#ff8888" />
           {selectedEnemy.maxShield > 0 && (
@@ -97,7 +120,7 @@ const UnitInfoOverlay: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
           {selectedUnits.map(unit => {
-            let icon = unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹';
+            let icon = unit.class === 'Ghost' ? '👻' : unit.class === 'Dragoon' ? '🤖' : '🦎';
             let label = RARITY_LABELS[unit.rarity];
             let color = RARITY_COLORS[unit.rarity];
             let bg = RARITY_BG[unit.rarity];
@@ -148,7 +171,7 @@ const UnitInfoOverlay: React.FC = () => {
       gimmickDesc = '게임의 진행 속도(배속)를 조절하는 투표 유닛입니다. 모든 플레이어의 배속 유닛이 x4 영역에 배치되면 4배속(매우 빠름)으로 작동하며, 하나라도 x2 영역에 있으면 2배속(보통)으로 작동합니다. 실제 게임 및 웨이브 대기 시간도 배속의 영향을 받습니다.';
     } else if (unit.id.includes('hero')) {
       gimmickIcon = '🎫';
-      gimmickDesc = '영웅 등급 유닛을 선택하거나 뽑을 수 있는 소모성 티켓 유닛입니다. 이 유닛을 원하는 직업 칸(영웅 전사 ⚔️, 영웅 마법사 🔮, 영웅 궁수 🏹, 또는 확률적인 🎁 랜덤 뽑기)으로 드래그하여 이동시키면 해당 유닛이 즉시 소환되고 선택권 유닛은 소멸합니다.';
+      gimmickDesc = '영웅 등급 유닛을 선택하거나 뽑을 수 있는 소모성 티켓 유닛입니다. 이 유닛을 원하는 직업 칸(고스트 👻, 드라군 🤖, 히드라 🦎, 또는 확률적인 🎁 랜덤 뽑기)으로 드래그하여 이동시키면 해당 유닛이 즉시 소환되고 선택권 유닛은 소멸합니다.';
     }
 
     return (
@@ -214,7 +237,7 @@ const UnitInfoOverlay: React.FC = () => {
         fontSize: '36px', flexShrink: 0,
         boxShadow: `0 0 16px ${rarityColor}44`,
       }}>
-        {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
+        {unit.class === 'Ghost' ? '👻' : unit.class === 'Dragoon' ? '🤖' : '🦎'}
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
@@ -238,8 +261,8 @@ const UnitInfoOverlay: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px' }}>
           <StatBox label="공격력" value={unit.damage.toLocaleString()} color="#ffd700" />
           <StatBox label="공격속도" value={`${unit.attackSpeed}s`} color="#88aaff" />
-          <StatBox label="사거리" value={unit.range} color="#88ddaa" />
-          <StatBox label="클래스" value={unit.class} color="#ddaaff" />
+          <StatBox label="공격형태" value={unit.attackType === 'Concussive' ? '진동형' : unit.attackType === 'Explosive' ? '폭발형' : '일반형'} color="#88ddaa" />
+          <StatBox label="클래스" value={unit.class === 'Ghost' ? '고스트' : unit.class === 'Dragoon' ? '드라군' : '히드라'} color="#ddaaff" />
         </div>
       </div>
     </div>

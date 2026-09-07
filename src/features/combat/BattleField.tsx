@@ -6,10 +6,34 @@ import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useRoomStore } from '../../store/roomStore';
 import { useChatStore } from '../../store/chatStore';
-import type { Position, Enemy, UnitRarity } from '../../types/game';
+import type { Position, Enemy, UnitRarity, UnitClass } from '../../types/game';
 import { generateId, RARITY_COLORS, RARITY_LABELS, getBaseStats, findSpawnPosition } from '../../utils/gachaUtils';
 import MapControls from './MapControls';
 import { getStageConfig } from '../../utils/stageUtils';
+import { createEnemyForWave, isBossStage, calculateAuthenticDamage } from '../../utils/monsterUtils';
+
+interface FloatingDamage {
+  id: string;
+  damage: number;
+  isCrit: boolean;
+  multiplier?: number;
+  x: number;
+  y: number;
+  startTime: number;
+}
+
+interface DeathParticle {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  size: number;
+  isCoin?: boolean;
+  startTime: number;
+  duration: number;
+}
 
 
 /* ── Web Audio API 8비트 효과음 신디사이저 ── */
@@ -106,7 +130,7 @@ const P1_WAYPOINTS: Position[] = (() => {
 
 interface Projectile {
   id: string;
-  type: 'aura' | 'sphere' | 'arrow';
+  type: 'laser' | 'plasma' | 'acid' | 'aura' | 'sphere' | 'arrow';
   from: Position;
   to: Position;
   duration: number;
@@ -170,14 +194,72 @@ const BattleField: React.FC = () => {
     handleMapClick, 
     scrollPos
   } = useUIStore();
-  const { wave, monsterCount, isGameOver, resetGame, isBgmOff } = useGameStore();
+  const { wave, monsterCount, isGameOver, isBgmOff } = useGameStore();
   const { currentRoom } = useRoomStore();
   
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
+  const [floatingDamages, setFloatingDamages] = useState<FloatingDamage[]>([]);
+  const [deathParticles, setDeathParticles] = useState<DeathParticle[]>([]);
+  const [screenShake, setScreenShake] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [bossWarning, setBossWarning] = useState<string | null>(null);
+  const [recoilTimes, setRecoilTimes] = useState<Record<string, number>>({});
+  const spawnedBossWave = useRef<number>(-1);
 
   // 마우스 드래그 선택 상태
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
+
+  const triggerScreenShake = (intensity = 4) => {
+    const rx = (Math.random() - 0.5) * intensity * 2;
+    const ry = (Math.random() - 0.5) * intensity * 2;
+    setScreenShake({ x: rx, y: ry });
+    setTimeout(() => setScreenShake({ x: 0, y: 0 }), 80);
+  };
+
+  const triggerDeathParticles = (x: number, y: number, isBoss = false) => {
+    const count = isBoss ? 32 : 12;
+    const now = performance.now();
+    const newParticles: DeathParticle[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * (isBoss ? 7 : 4);
+      const isCoin = Math.random() < (isBoss ? 0.6 : 0.35);
+      const colors = ['#ff4400', '#ffaa00', '#ffff00', '#ff2200', '#ffd700'];
+      const color = isCoin ? '#ffd700' : colors[Math.floor(Math.random() * colors.length)];
+
+      newParticles.push({
+        id: generateId(),
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (isCoin ? 2.5 : 0),
+        color,
+        size: isCoin ? 10 : (isBoss ? 8 : 5),
+        isCoin,
+        startTime: now,
+        duration: isBoss ? 900 : 650,
+      });
+    }
+
+    setDeathParticles(prev => [...prev, ...newParticles]);
+  };
+
+  // 글로벌 단축키 리스너 (G: 뽑기, U: 강화, I: 인벤토리, P: 확률)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const key = e.key.toUpperCase();
+      const ui = useUIStore.getState();
+
+      if (key === 'G') ui.setGachaModalOpen(!ui.isGachaModalOpen);
+      if (key === 'U') ui.setUpgradeModalOpen(!ui.isUpgradeModalOpen);
+      if (key === 'I') ui.setInventoryModalOpen(!ui.isInventoryModalOpen);
+      if (key === 'P') ui.setProbModalOpen(!ui.isProbModalOpen);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const lastSpawnTime = useRef(performance.now());
   const lastAttackTimes = useRef<Record<string, number>>({});
@@ -188,37 +270,38 @@ const BattleField: React.FC = () => {
   const playerSlots = currentRoom?.slots.filter(s => s.status === 'PLAYER') || [{ id: 1, playerName: '나(방장)' }];
   const playerCount = playerSlots.length;
 
-  const triggerHeroSelection = (playerId: number, chosenType: 'Warrior' | 'Mage' | 'Archer' | 'Random' | 'Gold') => {
+  const triggerHeroSelection = (playerId: number, chosenType: 'Ghost' | 'Dragoon' | 'Hydra' | 'Random' | 'Mineral') => {
     const { addMessage } = useChatStore.getState();
 
-    if (chosenType === 'Gold') {
+    if (chosenType === 'Mineral') {
       if (playerId === 1) {
-        useGameStore.getState().addGold(50);
+        useGameStore.getState().addMineral(50);
       }
       removeUnit(`gimmick-hero-P${playerId}`);
       const sep = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-      addMessage(sep, '#fbbf24');
-      addMessage(`[선택권] P${playerId}님이 [💰 50골드 지원 💰]을 선택하여 50골드를 획득했습니다!`, '#fbbf24');
-      addMessage(sep, '#fbbf24');
+      addMessage(sep, '#38bdf8');
+      addMessage(`[선택권] P${playerId}님이 [💎 50 미네랄 지원 💎]을 선택하여 50 미네랄을 획득했습니다!`, '#38bdf8');
+      addMessage(sep, '#38bdf8');
       return;
     }
 
     const center = MAP_CENTERS[playerId - 1];
     if (!center) return;
 
-    let rarity: UnitRarity = 'Hero';
-    let unitClass: 'Warrior' | 'Mage' | 'Archer' = 'Warrior';
+    let rarity: UnitRarity = 'Narrative'; // 기본 서사 등급
+    let unitClass: UnitClass = 'Ghost';
 
     if (chosenType === 'Random') {
+      // 메운디 9.0 공식 보스 랜덤 확률: 일반 15%, 서사 55%, 전설 25%, 신화 5%
       const rand = Math.random() * 100;
-      if (rand < 0.5) rarity = 'Apocalypse';
-      else if (rand < 5.0) rarity = 'Primeval';
-      else if (rand < 25.0) rarity = 'Mythic';
-      else rarity = 'Hero';
+      if (rand < 5.0) rarity = 'Mythic';
+      else if (rand < 30.0) rarity = 'Legendary';
+      else if (rand < 85.0) rarity = 'Narrative';
+      else rarity = 'Common';
 
-      unitClass = (['Warrior', 'Mage', 'Archer'] as const)[Math.floor(Math.random() * 3)];
+      unitClass = (['Ghost', 'Dragoon', 'Hydra'] as const)[Math.floor(Math.random() * 3)];
     } else {
-      rarity = 'Hero';
+      rarity = 'Narrative';
       unitClass = chosenType;
     }
 
@@ -233,6 +316,7 @@ const BattleField: React.FC = () => {
       name: unitName,
       rarity,
       class: unitClass,
+      attackType: stats.attackType,
       damage: stats.damage,
       attackSpeed: stats.attackSpeed,
       range: stats.range,
@@ -287,8 +371,9 @@ const BattleField: React.FC = () => {
           addUnit({
             id: `gimmick-${type}-P${slot.id}`,
             name: `${korName} (P${slot.id})`,
-            rarity: 'Normal',
-            class: 'Warrior',
+            rarity: 'Common',
+            class: 'Ghost',
+            attackType: 'Concussive',
             damage: 0,
             attackSpeed: 99999,
             range: 0,
@@ -408,25 +493,36 @@ const BattleField: React.FC = () => {
     const currentStageTimeLeft = gameState.stageTimeLeft;
     const isSpawningAllowed = currentWave === 1 ? currentStageTimeLeft <= 120 : currentStageTimeLeft <= 130;
 
-    if (!isSpawningAllowed) {
-      // 스폰 대기 시간 동안은 소환 시간(lastSpawnTime) 기준점 동기화 유지
-      lastSpawnTime.current = time;
+    const isBossRound = isBossStage(currentWave);
+
+    if (isBossRound) {
+      // 보스 스테이지: 웨이브당 단 1마리의 거대 보스만 단독 소환!
+      if (isSpawningAllowed && spawnedBossWave.current !== currentWave) {
+        spawnedBossWave.current = currentWave;
+        const newBoss = createEnemyForWave(currentWave, P1_WAYPOINTS[0]);
+        spawnEnemy(newBoss);
+        
+        // 보스 경고 사이렌 배너 및 화면 강진동 연출
+        setBossWarning(newBoss.name);
+        triggerScreenShake(10);
+        setTimeout(() => setBossWarning(null), 3500);
+
+        useChatStore.getState().addMessage('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '#ff2200');
+        useChatStore.getState().addMessage(`🚨 [긴급 보스 출현] ${newBoss.name}이(가) 등장했습니다!`, '#ff2200');
+        useChatStore.getState().addMessage('제한 시간 내에 모든 화력을 집중하여 격파하십시오!', '#ffdd00');
+        useChatStore.getState().addMessage('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '#ff2200');
+      }
     } else {
-      const spawnInterval = 1500 / (speedMultiplier / 2);
-      if (time - lastSpawnTime.current > spawnInterval) {
-        spawnEnemy({
-          id: generateId(),
-          name: `Wave ${currentWave} Slime`,
-          hp: 30 + currentWave * 20,
-          maxHp: 30 + currentWave * 20,
-          shield: currentWave > 10 ? (currentWave - 10) * 10 : 0,
-          maxShield: currentWave > 10 ? (currentWave - 10) * 10 : 0,
-          speed: 1,
-          position: { ...P1_WAYPOINTS[0] },
-          reward: 5,
-          waypointIndex: 1,
-        });
+      // 일반 스테이지: 스폰 대기 시간 동안은 소환 시간 동기화 유지
+      if (!isSpawningAllowed) {
         lastSpawnTime.current = time;
+      } else {
+        const spawnInterval = 1500 / (speedMultiplier / 2);
+        if (time - lastSpawnTime.current > spawnInterval) {
+          const newEnemy = createEnemyForWave(currentWave, P1_WAYPOINTS[0]);
+          spawnEnemy(newEnemy);
+          lastSpawnTime.current = time;
+        }
       }
     }
 
@@ -451,15 +547,58 @@ const BattleField: React.FC = () => {
         }
 
         if (closestEnemy) {
-          damageEnemy((closestEnemy as Enemy).id, unit.damage);
+          // 직업 업그레이드가 반영된 최종 공격력 계산
+          const baseDmg = useGameStore.getState().calculateUnitDamage(unit.damage, unit.class);
+          const hasShield = (closestEnemy.shield || 0) > 0;
+          const { finalDamage, multiplier } = calculateAuthenticDamage(
+            baseDmg,
+            unit.attackType,
+            closestEnemy.size,
+            closestEnemy.armor,
+            hasShield
+          );
+
+          // 20% 확률로 크리티컬 히트 (1.5배)
+          const isCrit = Math.random() < 0.2;
+          const dealtDamage = isCrit ? Math.floor(finalDamage * 1.5) : finalDamage;
+
+          // 적 사망 판정 (폭사 쾌감 연출)
+          const willDie = (closestEnemy.hp + (closestEnemy.shield || 0)) <= dealtDamage;
+          const isBoss = !!(closestEnemy as any).isBoss;
+
+          damageEnemy((closestEnemy as Enemy).id, dealtDamage);
           lastAttackTimes.current[unit.id] = time;
+          setRecoilTimes(prev => ({ ...prev, [unit.id]: time }));
+
+          if (willDie) {
+            triggerDeathParticles(closestEnemy.position.x, closestEnemy.position.y, isBoss);
+            triggerScreenShake(isBoss ? 12 : 5);
+          } else if (isCrit) {
+            triggerScreenShake(3);
+          } else if (isBoss) {
+            triggerScreenShake(1.5);
+          }
+
+          // 데미지 플로팅 텍스트 등록 (450ms 지속)
+          setFloatingDamages(prev => [
+            ...prev,
+            {
+              id: generateId(),
+              damage: dealtDamage,
+              isCrit,
+              multiplier,
+              x: closestEnemy!.position.x + (Math.random() * 24 - 12),
+              y: closestEnemy!.position.y - 15,
+              startTime: time,
+            }
+          ]);
 
           // 8비트 효과음 재생
-          const sfxType = unit.class === 'Warrior' ? 'sword' : unit.class === 'Mage' ? 'magic' : 'bow';
+          const sfxType = unit.class === 'Ghost' ? 'sword' : unit.class === 'Dragoon' ? 'magic' : 'bow';
           playSfx(sfxType);
-          setTimeout(() => playSfx('hit'), 150);
+          setTimeout(() => playSfx('hit'), 100);
 
-          const type = unit.class === 'Warrior' ? 'aura' : unit.class === 'Mage' ? 'sphere' : 'arrow';
+          const type = unit.class === 'Ghost' ? 'laser' : unit.class === 'Dragoon' ? 'plasma' : 'acid';
           setProjectiles(prev => [
             ...prev,
             {
@@ -467,7 +606,7 @@ const BattleField: React.FC = () => {
               type,
               from: { ...unit.position },
               to: { ...closestEnemy!.position },
-              duration: 300,
+              duration: 250,
               startTime: time
             }
           ]);
@@ -475,6 +614,16 @@ const BattleField: React.FC = () => {
       }
     });
 
+    setDeathParticles(prev => prev
+      .filter(p => performance.now() - p.startTime < p.duration)
+      .map(p => ({
+        ...p,
+        x: p.x + p.vx,
+        y: p.y + p.vy,
+        vy: p.vy + 0.2,
+      }))
+    );
+    setFloatingDamages(prev => prev.filter(d => performance.now() - d.startTime < 450));
     setProjectiles(prev => prev.filter(p => performance.now() - p.startTime < p.duration));
     requestRef.current = requestAnimationFrame(animate);
   };
@@ -626,10 +775,10 @@ const BattleField: React.FC = () => {
 
           // 상단 행(Y < 2300)으로 올라갔을 때만 선택 확정 및 보상 처리
           if (clampedY < 2300) {
-            let chosenType: 'Warrior' | 'Mage' | 'Archer' | 'Random' = 'Random';
-            if (clampedX < 1870) chosenType = 'Warrior';
-            else if (clampedX < 2000) chosenType = 'Mage';
-            else if (clampedX < 2130) chosenType = 'Archer';
+            let chosenType: 'Ghost' | 'Dragoon' | 'Hydra' | 'Random' = 'Random';
+            if (clampedX < 1870) chosenType = 'Ghost';
+            else if (clampedX < 2000) chosenType = 'Dragoon';
+            else if (clampedX < 2130) chosenType = 'Hydra';
             else chosenType = 'Random';
 
             // 0.2초 딜레이 후에 획득 처리 (이동 시각적 연출을 위한 딜레이)
@@ -736,6 +885,10 @@ const BattleField: React.FC = () => {
     >
       <div 
         className="w-[4000px] h-[4000px] relative"
+        style={{
+          transform: `translate(${screenShake.x}px, ${screenShake.y}px)`,
+          transition: 'transform 0.05s ease-out',
+        }}
       >
         {/* ── 배경 페이드아웃 및 다음 맵 대기 레이어 ── */}
         <BattleFieldBackground />
@@ -955,7 +1108,7 @@ const BattleField: React.FC = () => {
             overflow: 'hidden'
           }}>
             {/* ── ROW 1: Options (Y < 2300) ── */}
-            {/* Col 1: Warrior */}
+            {/* Col 1: Ghost */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -969,10 +1122,10 @@ const BattleField: React.FC = () => {
               borderBottom: '2px solid #111',
               boxSizing: 'border-box'
             }}>
-              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#cc3030' }}>⚔️ 영웅 전사</span>
+              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#cc3030' }}>👻 고스트 (진동형)</span>
             </div>
 
-            {/* Col 2: Mage */}
+            {/* Col 2: Dragoon */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -981,15 +1134,15 @@ const BattleField: React.FC = () => {
               gap: '4px',
               textAlign: 'center',
               padding: '10px 5px',
-              background: '#fbf0ff',
+              background: '#f0f5ff',
               borderRight: '1px dashed #dccfc4',
               borderBottom: '2px solid #111',
               boxSizing: 'border-box'
             }}>
-              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#8844cc' }}>🔮 영웅 마법사</span>
+              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#2b6cb0' }}>🤖 드라군 (폭발형)</span>
             </div>
 
-            {/* Col 3: Archer */}
+            {/* Col 3: Hydra */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -1003,7 +1156,7 @@ const BattleField: React.FC = () => {
               borderBottom: '2px solid #111',
               boxSizing: 'border-box'
             }}>
-              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#229944' }}>🏹 영웅 궁수</span>
+              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#229944' }}>🦎 히드라 (일반형)</span>
             </div>
 
             {/* Col 4: Random */}
@@ -1077,9 +1230,9 @@ const BattleField: React.FC = () => {
                   return (
                     <div key={slot.id} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <span>👤 P{slot.id}:</span>
-                      <button onClick={() => triggerHeroSelection(slot.id, 'Warrior')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>⚔️</button>
-                      <button onClick={() => triggerHeroSelection(slot.id, 'Mage')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>🔮</button>
-                      <button onClick={() => triggerHeroSelection(slot.id, 'Archer')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>🏹</button>
+                      <button onClick={() => triggerHeroSelection(slot.id, 'Ghost')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>👻</button>
+                      <button onClick={() => triggerHeroSelection(slot.id, 'Dragoon')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>🤖</button>
+                      <button onClick={() => triggerHeroSelection(slot.id, 'Hydra')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fff' }}>🦎</button>
                       <button onClick={() => triggerHeroSelection(slot.id, 'Random')} style={{ padding: '1px 3px', fontSize: '8px', cursor: 'pointer', border: '1px solid #cbbba9', background: '#fb923c', color: '#fff', fontWeight: 'bold' }}>🎲</button>
                     </div>
                   );
@@ -1161,48 +1314,109 @@ const BattleField: React.FC = () => {
           </div>
         )}
 
-        {isGameOver && (
-          <div className="fixed inset-0 bg-black/80 z-[1000] flex flex-col items-center justify-center gap-6">
-            <h2 className="text-8xl font-black text-red-600 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">GAME OVER</h2>
-            <p className="text-white text-xl">몬스터가 80마리 이상 쌓였습니다.</p>
-            <button 
-              onClick={() => {
-                resetGame();
-                window.location.reload();
-              }}
-              className="maple-button !py-4 !px-12 !text-2xl"
-            >
-              다시 시작하기
-            </button>
-          </div>
-        )}
 
-        {enemies.map((enemy) => (
-          <div
-            key={enemy.id}
-            className={`absolute w-8 h-8 rounded-md border-2 border-red-900 bg-red-600 shadow-lg flex items-center justify-center transition-all cursor-none ${
-              selectedEnemyId === enemy.id ? 'ring-4 ring-red-400 scale-110' : 'hover:scale-105'
-            }`}
-            style={{
-              left: enemy.position.x,
-              top: enemy.position.y,
-              transform: 'translate(-50%, -50%)',
-              zIndex: 15
-            }}
-          >
-            <div className="absolute -top-4 left-0 w-full h-1 bg-gray-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-red-500" 
-                style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}
-              />
+        {enemies.map((enemy) => {
+          const isBoss = (enemy as any).isBoss;
+          const emoji = (enemy as any).emoji || '👹';
+          const size = isBoss ? 'w-14 h-14' : 'w-9 h-9';
+          const isSelected = selectedEnemyId === enemy.id;
+
+          return (
+            <div
+              key={enemy.id}
+              className={`absolute ${size} rounded-lg flex items-center justify-center transition-all cursor-none ${
+                isBoss 
+                  ? 'border-2 border-yellow-400 bg-gradient-to-b from-amber-600 to-red-900 shadow-[0_0_20px_rgba(255,215,0,0.6)] animate-pulse'
+                  : 'border-2 border-red-900 bg-gradient-to-b from-red-600 to-red-950 shadow-md'
+              } ${isSelected ? 'ring-4 ring-yellow-300 scale-110' : 'hover:scale-105'}`}
+              style={{
+                left: enemy.position.x,
+                top: enemy.position.y,
+                transform: 'translate(-50%, -50%)',
+                zIndex: isBoss ? 20 : 15,
+              }}
+            >
+              {/* 체력바 & 쉴드바 & 크기/방어 배지 */}
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-[130%] flex flex-col gap-0.5 pointer-events-none">
+                {isBoss && (
+                  <div className="text-[9px] font-black text-amber-300 text-center tracking-tighter truncate drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                    {enemy.name}
+                  </div>
+                )}
+                {enemy.maxShield > 0 && (
+                  <div className="w-full h-1 bg-gray-900/80 rounded-full overflow-hidden border border-blue-900">
+                    <div
+                      className="h-full bg-blue-400"
+                      style={{ width: `${(enemy.shield / enemy.maxShield) * 100}%` }}
+                    />
+                  </div>
+                )}
+                <div className="w-full h-1.5 bg-gray-900/80 rounded-full overflow-hidden border border-black/40">
+                  <div 
+                    className={`h-full ${isBoss ? 'bg-gradient-to-r from-yellow-400 to-red-500' : 'bg-red-500'}`} 
+                    style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}
+                  />
+                </div>
+                {/* 몬스터 크기 & 방어력 배지 */}
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  <span className={`text-[8px] font-black px-1 rounded leading-tight shadow-sm ${
+                    enemy.size === 'Small' 
+                      ? 'bg-blue-600/90 text-blue-100 border border-blue-400/40' 
+                      : enemy.size === 'Medium' 
+                        ? 'bg-amber-600/90 text-amber-100 border border-amber-400/40' 
+                        : 'bg-red-600/90 text-red-100 border border-red-400/40'
+                  }`}>
+                    {enemy.size === 'Small' ? '소형' : enemy.size === 'Medium' ? '중형' : '대형'}
+                  </span>
+                  {enemy.armor > 0 && (
+                    <span className="text-[7.5px] font-bold px-1 rounded bg-gray-800/90 text-gray-200 border border-gray-600/60 leading-tight">
+                      방어 {enemy.armor}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 몬스터 이모지 아이콘 */}
+              <span className={isBoss ? 'text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' : 'text-base drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'}>
+                {emoji}
+              </span>
             </div>
-            <span className="text-white text-[10px] font-bold">👹</span>
-          </div>
-        ))}
+          );
+        })}
+
+        {/* 메이플 스타일 플로팅 데미지 텍스트 */}
+        {floatingDamages.map(d => {
+          const progress = (performance.now() - d.startTime) / 450;
+          const curY = d.y - progress * 45;
+          return (
+            <div
+              key={d.id}
+              className="absolute pointer-events-none font-black select-none"
+              style={{
+                left: d.x,
+                top: curY,
+                transform: 'translate(-50%, -50%)',
+                fontSize: d.isCrit ? '22px' : '16px',
+                color: d.isCrit ? '#ff2200' : '#ff9900',
+                textShadow: d.isCrit 
+                  ? '0 0 5px #ffff00, 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
+                  : '1.5px 1.5px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
+                opacity: 1 - progress,
+                zIndex: 40,
+                fontFamily: '"Impact", "Arial Black", "Gulim", sans-serif',
+                letterSpacing: '1px',
+              }}
+            >
+              {d.isCrit && <span style={{ fontSize: '11px', color: '#ffea00', display: 'block', textAlign: 'center', lineHeight: 1 }}>CRIT!</span>}
+              {d.damage.toLocaleString()}
+            </div>
+          );
+        })}
 
         {units.map((unit) => {
           const isSelected = selectedUnitIds.includes(unit.id);
           const isGimmick = unit.isGimmickUnit;
+          const isRecoil = !isGimmick && recoilTimes[unit.id] && (performance.now() - recoilTimes[unit.id] < 120);
           
           // 기능 직관성을 위한 기믹 유닛 이모지 매핑
           let gimmickEmoji = '🎵'; // Default BGM
@@ -1213,13 +1427,14 @@ const BattleField: React.FC = () => {
           return (
             <div
               key={unit.id}
-              className={`absolute rounded-full border-2 flex items-center justify-center font-bold text-white shadow-md transition-all cursor-none ${
+              className={`absolute rounded-full border-2 flex items-center justify-center font-bold text-white shadow-md cursor-none ${
                 isSelected ? 'scale-125 ring-4 ring-yellow-400 border-white' : 'border-black hover:scale-110'
               }`}
               style={{
                 left: unit.position.x,
                 top: unit.position.y,
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(-50%, -50%) ${isRecoil ? 'scale(1.22) translateY(-2px)' : 'scale(1)'}`,
+                transition: 'transform 0.08s ease-out',
                 width: '32px',
                 height: '32px',
                 backgroundColor: isGimmick ? '#f8f4f0' : RARITY_COLORS[unit.rarity],
@@ -1228,7 +1443,7 @@ const BattleField: React.FC = () => {
               }}
             >
               <span className="text-xs pointer-events-none" style={{ textShadow: isGimmick ? 'none' : '1px 1px 0 #000' }}>
-                {isGimmick ? gimmickEmoji : (unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹')}
+                {isGimmick ? gimmickEmoji : (unit.class === 'Ghost' ? '👻' : unit.class === 'Dragoon' ? '🤖' : '🦎')}
               </span>
               
               {/* 플레이어 식별 꼬마 배지 (우측 상단) */}
@@ -1268,11 +1483,15 @@ const BattleField: React.FC = () => {
           const progress = (performance.now() - p.startTime) / p.duration;
           const curX = p.from.x + (p.to.x - p.from.x) * progress;
           const curY = p.from.y + (p.to.y - p.from.y) * progress;
+          const angle = Math.atan2(p.to.y - p.from.y, p.to.x - p.from.x) * 180 / Math.PI + 90;
 
           return (
             <div 
               key={p.id}
               className={`absolute pointer-events-none ${
+                p.type === 'laser' ? 'w-1.5 h-7 bg-red-400 rounded-full shadow-[0_0_10px_#ff3333]' :
+                p.type === 'plasma' ? 'w-4 h-4 bg-cyan-300 rounded-full shadow-[0_0_12px_#00ffff] animate-pulse' :
+                p.type === 'acid' ? 'w-2 h-6 bg-lime-400 rounded-full shadow-[0_0_10px_#84cc16]' :
                 p.type === 'aura' ? 'w-12 h-12 bg-yellow-400/40 rounded-full blur-md' :
                 p.type === 'sphere' ? 'w-4 h-4 bg-purple-500 rounded-full shadow-[0_0_10px_purple]' :
                 'w-1 h-6 bg-white rotate-45 border-l-2 border-gray-400'
@@ -1280,15 +1499,247 @@ const BattleField: React.FC = () => {
               style={{
                 left: curX,
                 top: curY,
-                transform: `translate(-50%, -50%) ${p.type === 'arrow' ? `rotate(${Math.atan2(p.to.y - p.from.y, p.to.x - p.from.x) * 180 / Math.PI + 90}deg)` : ''}`,
+                transform: `translate(-50%, -50%) ${['laser', 'acid', 'arrow'].includes(p.type) ? `rotate(${angle}deg)` : ''}`,
                 opacity: 1 - progress,
                 zIndex: 20
               }}
             />
           );
         })}
+        {/* 폭사 파편 및 황금 코인 파티클 (타격감 & 도파민) */}
+        {deathParticles.map((p) => {
+          const progress = (performance.now() - p.startTime) / p.duration;
+          return (
+            <div
+              key={p.id}
+              className="absolute pointer-events-none select-none flex items-center justify-center font-bold"
+              style={{
+                left: p.x,
+                top: p.y,
+                transform: 'translate(-50%, -50%)',
+                opacity: Math.max(0, 1 - progress),
+                zIndex: 35,
+                color: p.color,
+                fontSize: p.isCoin ? `${p.size + 4}px` : `${p.size}px`,
+                filter: p.isCoin ? 'drop-shadow(0 0 6px rgba(255,215,0,0.8))' : 'drop-shadow(0 0 4px rgba(255,100,0,0.8))',
+              }}
+            >
+              {p.isCoin ? (
+                <span>🪙</span>
+              ) : (
+                <div
+                  style={{
+                    width: `${p.size}px`,
+                    height: `${p.size}px`,
+                    borderRadius: '50%',
+                    backgroundColor: p.color,
+                    boxShadow: `0 0 8px ${p.color}`,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
-      
+
+      {/* ── 보스 출현 사이렌 긴급 경고 배너 ── */}
+      {bossWarning && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '16px 40px',
+            background: 'linear-gradient(180deg, rgba(180, 0, 0, 0.95), rgba(80, 0, 0, 0.95))',
+            border: '3px solid #ffdd00',
+            borderRadius: '8px',
+            boxShadow: '0 0 35px rgba(255, 0, 0, 0.8), inset 0 0 20px rgba(255, 220, 0, 0.3)',
+            pointerEvents: 'none',
+            fontFamily: '"Gulim", "Dotum", sans-serif',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '24px' }}>🚨</span>
+            <span
+              style={{
+                color: '#ffdd00',
+                fontSize: '22px',
+                fontWeight: 900,
+                letterSpacing: '3px',
+                textShadow: '0 0 10px #ff0000',
+                fontFamily: '"Impact", "Arial Black", sans-serif',
+              }}
+            >
+              WARNING: BOSS APPROACHING
+            </span>
+            <span style={{ fontSize: '24px' }}>🚨</span>
+          </div>
+          <div
+            style={{
+              color: '#ffffff',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px #000',
+            }}
+          >
+            {bossWarning}
+          </div>
+        </div>
+      )}
+
+      {/* ── 상단 대형 메이플스토리 보스 HP 게이지 ── */}
+      {(() => {
+        const activeBoss = enemies.find(e => (e as any).isBoss);
+        if (!activeBoss) return null;
+        const hpPercent = Math.max(0, Math.min(100, (activeBoss.hp / activeBoss.maxHp) * 100));
+        const shieldPercent = activeBoss.maxShield > 0 ? (activeBoss.shield / activeBoss.maxShield) * 100 : 0;
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: '58px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '540px',
+              zIndex: 900,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              padding: '8px 16px',
+              background: 'linear-gradient(180deg, rgba(20, 10, 5, 0.92), rgba(10, 5, 2, 0.96))',
+              border: '2px solid #d4af37',
+              borderRadius: '6px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.85), 0 0 15px rgba(212, 175, 55, 0.4)',
+              pointerEvents: 'none',
+              fontFamily: '"Gulim", "Dotum", sans-serif',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '18px' }}>{(activeBoss as any).emoji || '👑'}</span>
+                <span style={{ color: '#ffd700', fontWeight: 'bold', fontSize: '14px', textShadow: '0 0 6px #000' }}>
+                  {activeBoss.name}
+                </span>
+              </div>
+              <span style={{ color: '#ff8888', fontWeight: 'bold', fontSize: '12px', letterSpacing: '0.5px' }}>
+                {activeBoss.hp.toLocaleString()} / {activeBoss.maxHp.toLocaleString()} ({hpPercent.toFixed(1)}%)
+              </span>
+            </div>
+
+            {/* 쉴드 게이지 */}
+            {activeBoss.maxShield > 0 && (
+              <div style={{ width: '100%', height: '4px', background: '#111', borderRadius: '2px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${shieldPercent}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #38bdf8, #0284c7)',
+                    boxShadow: '0 0 6px #38bdf8',
+                    transition: 'width 0.1s linear',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* HP 게이지 */}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '14px',
+                background: '#2b0b0b',
+                borderRadius: '3px',
+                border: '1px solid #7f1d1d',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${hpPercent}%`,
+                  height: '100%',
+                  background: 'linear-gradient(180deg, #ff4444 0%, #b91c1c 50%, #7f1d1d 100%)',
+                  boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)',
+                  transition: 'width 0.1s linear',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: 900,
+                  color: '#ffffff',
+                  textShadow: '1px 1px 2px #000',
+                }}
+              >
+                BOSS HP
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── 메운디 손맛 도파민 콤보 배너 (우측 상단) ── */}
+      {(() => {
+        const comboCount = useGameStore(state => state.comboCount);
+        if (comboCount < 3) return null;
+
+        const isFever = comboCount >= 10;
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: '68px',
+              right: '24px',
+              zIndex: 900,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '8px 16px',
+              background: isFever 
+                ? 'linear-gradient(135deg, rgba(255, 68, 0, 0.9), rgba(180, 0, 0, 0.9))' 
+                : 'linear-gradient(135deg, rgba(30, 20, 10, 0.85), rgba(15, 10, 5, 0.9))',
+              border: `2px solid ${isFever ? '#ffea00' : '#eab308'}`,
+              borderRadius: '6px',
+              boxShadow: isFever ? '0 0 20px rgba(255, 100, 0, 0.8)' : '0 4px 12px rgba(0,0,0,0.6)',
+              transform: `scale(${Math.min(1.25, 1 + comboCount * 0.015)})`,
+              transition: 'transform 0.1s ease',
+              pointerEvents: 'none',
+              fontFamily: '"Impact", "Arial Black", sans-serif',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '18px' }}>🔥</span>
+              <span
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 900,
+                  color: isFever ? '#ffff00' : '#ffaa00',
+                  letterSpacing: '1px',
+                  textShadow: '0 0 10px rgba(255, 100, 0, 0.8), 1px 1px 2px #000',
+                }}
+              >
+                {comboCount} COMBO!
+              </span>
+            </div>
+            {isFever && (
+              <span style={{ fontSize: '10px', color: '#ffffff', fontWeight: 'bold', letterSpacing: '1px' }}>
+                ⚡ FEVER MINERAL BONUS! ⚡
+              </span>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -23,46 +23,48 @@ const ChatOverlay: React.FC = () => {
               const parts = inputValue.split(' ');
               if (parts.length >= 2) {
                 const inputRarity = parts[1].toLowerCase();
-                // 등급 매핑 업데이트
-                const rarityMap: Record<string, string> = {
-                  '일반': 'Normal', '레어': 'Rare', '에픽': 'Epic', '유니크': 'Unique', 
-                  '레전더리': 'Legendary', '영웅': 'Hero', '신화': 'Mythic', '태초': 'Primeval', '종말': 'Apocalypse',
-                  'normal': 'Normal', 'rare': 'Rare', 'epic': 'Epic', 'unique': 'Unique',
-                  'legendary': 'Legendary', 'hero': 'Hero', 'mythic': 'Mythic', 'primeval': 'Primeval', 'apocalypse': 'Apocalypse'
+                // 9개 메운디 공인 등급 매핑
+                const rarityMap: Record<string, UnitRarity> = {
+                  '일반': 'Common', '레어': 'Rare', '고대': 'Ancient', '유물': 'Artifact', 
+                  '서사': 'Narrative', '전설': 'Legendary', '에픽': 'Epic', '신화': 'Mythic', '태초': 'Primeval',
+                  'common': 'Common', 'rare': 'Rare', 'ancient': 'Ancient', 'artifact': 'Artifact',
+                  'narrative': 'Narrative', 'legendary': 'Legendary', 'epic': 'Epic', 'mythic': 'Mythic', 'primeval': 'Primeval'
                 };
 
-                const requestedRarity = rarityMap[inputRarity];
+                const unitRarity = rarityMap[inputRarity];
 
-                if (requestedRarity) {
-                  const unitRarity = requestedRarity as UnitRarity;
-                  const unitClass = (['Warrior', 'Mage', 'Archer'] as any[])[Math.floor(Math.random() * 3)];
+                if (unitRarity) {
+                  const unitClasses: ('Ghost' | 'Dragoon' | 'Hydra')[] = ['Ghost', 'Dragoon', 'Hydra'];
+                  const unitClass = unitClasses[Math.floor(Math.random() * unitClasses.length)];
                   const stats = getBaseStats(unitRarity, unitClass);
                   const unitLabel = RARITY_LABELS[unitRarity];
-                  const unitName = `${unitLabel} ${unitClass}`;
+                  const unitClassName = unitClass === 'Ghost' ? '고스트' : unitClass === 'Dragoon' ? '드라군' : '히드라';
+                  const unitName = `${unitLabel} ${unitClassName}`;
                   
                   addUnit({
                     id: generateId(),
                     name: unitName,
                     rarity: unitRarity,
                     class: unitClass,
+                    attackType: stats.attackType,
                     damage: stats.damage,
                     attackSpeed: stats.attackSpeed,
                     range: stats.range,
                     position: { x: 1000 + (Math.random() * 60 - 30), y: 1000 + (Math.random() * 60 - 30) },
                   });
 
-                  const specialRarities = ['Legendary', 'Hero', 'Mythic', 'Primeval', 'Apocalypse'];
+                  const specialRarities: UnitRarity[] = ['Legendary', 'Epic', 'Mythic', 'Primeval'];
                   if (specialRarities.includes(unitRarity)) {
                     const color = RARITY_COLORS[unitRarity];
                     const sep = '------------------------------------------';
                     addMessage(sep, color);
-                    addMessage(`[치트] ★ ${unitLabel} ★ 소환 성공!`, color);
+                    addMessage(`[치트] ★ ${unitLabel} (${unitClassName}) ★ 소환 성공!`, color);
                     addMessage(sep, color);
                   } else {
-                    addMessage(`[치트] ${unitName} 소환됨`, RARITY_COLORS[unitRarity]);
+                    addMessage(`[치트] ${unitName} 소환 완료!`, RARITY_COLORS[unitRarity]);
                   }
                 } else {
-                  addMessage(`[오류] 등급명이 정확하지 않습니다. (예: /spawn 종말)`, '#ff4444');
+                  addMessage(`[오류] 등급명이 정확하지 않습니다. (예: /spawn 태초, /spawn 신화, /spawn 서사)`, '#ff4444');
                 }
               }
             } else {

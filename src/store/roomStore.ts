@@ -27,23 +27,8 @@ interface RoomState {
   setMode: (mode: GameMode) => void;
 }
 
-// 더미 방 데이터 20개 생성 (페이징 테스트용)
-const generateDummyRooms = (): RoomInfo[] => {
-  return Array.from({ length: 20 }, (_, i) => ({
-    id: `room-${i}`,
-    title: `초보만 오세요 ${i + 1}`,
-    mode: i % 2 === 0 ? 'INDIVIDUAL' : 'COOP',
-    slots: [
-      { id: 1, status: 'PLAYER', playerName: `Host${i}` },
-      { id: 2, status: 'OPEN' },
-      { id: 3, status: 'CLOSED' },
-      { id: 4, status: 'OPEN' },
-    ]
-  }));
-};
-
 export const useRoomStore = create<RoomState>((set, get) => ({
-  rooms: generateDummyRooms(),
+  rooms: [],
   currentRoom: null,
 
   createRoom: (title, mode) => {

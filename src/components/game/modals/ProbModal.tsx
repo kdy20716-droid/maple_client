@@ -3,16 +3,16 @@ import { useUIStore } from '../../../store/uiStore';
 import type { UnitRarity } from '../../../types/game';
 import { RARITY_COLORS, RARITY_LABELS } from '../../../utils/gachaUtils';
 
-const GACHA_RATES = {
-  Normal: '50.0%',
-  Rare: '25.0%',
-  Epic: '12.0%',
-  Unique: '6.0%',
-  Legendary: '4.0%',
-  Hero: '2.0%',
-  Mythic: '0.9%',
-  Primeval: '0.09%',
-  Apocalypse: '0.01%',
+const GACHA_RATES: Record<UnitRarity, string> = {
+  Common: '40.03%',
+  Rare: '33.00%',
+  Ancient: '15.00%',
+  Artifact: '8.00%',
+  Narrative: '2.30%',
+  Legendary: '1.00%',
+  Epic: '0.30%',
+  Mythic: '0.31%',
+  Primeval: '0.06%',
 };
 
 const ProbModal: React.FC = () => {

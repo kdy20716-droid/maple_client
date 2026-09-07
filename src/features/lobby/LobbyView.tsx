@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useRoomStore } from '../../store/roomStore';
 import type { RoomInfo } from '../../store/roomStore';
 import { useAppStore } from '../../store/appStore';
+import { useUIStore } from '../../store/uiStore';
 
 const ITEMS_PER_PAGE = 12;
 
@@ -488,10 +489,10 @@ const LobbyView: React.FC = () => {
                 <MBtn variant="green" onClick={() => setShowCreate(true)} className="w-full">
                   ⚔ 방 만들기
                 </MBtn>
-                <MBtn variant="blue" onClick={() => {}} className="w-full">
+                <MBtn variant="blue" onClick={() => useUIStore.getState().setRankingModalOpen(true)} className="w-full">
                   🏆 랭킹 보기
                 </MBtn>
-                <MBtn variant="brown" onClick={() => {}} className="w-full">
+                <MBtn variant="brown" onClick={() => useUIStore.getState().setCodexModalOpen(true)} className="w-full">
                   📖 도감
                 </MBtn>
                 <div style={{ borderTop: '1px solid #3a2010', paddingTop: '8px', marginTop: '2px' }}>
@@ -557,10 +558,7 @@ const FloatLeaf: React.FC<{ leaf: typeof LEAVES[0] }> = ({ leaf }) => (
 
 /* ── 공지사항 데이터 ─── */
 const NOTICES = [
-  { date: '2025.06.11', text: '메이플 디펜스 서버 오픈!' },
-  { date: '2025.06.11', text: '레전더리 이상 등급 등장 이펙트 추가' },
-  { date: '2025.06.10', text: '서버 점검 완료 (00:00~02:00)' },
-  { date: '2025.06.09', text: '랭킹 시스템 업데이트 예정' },
+  { date: '2026.09.07', text: '🍁 메이플 운빨 디펜스(메운디) 대규모 150스테이지 업데이트!' },
 ];
 
 /* ── 팁 ─── */

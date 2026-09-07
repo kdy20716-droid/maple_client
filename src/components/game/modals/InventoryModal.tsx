@@ -183,7 +183,7 @@ const InventoryModal: React.FC = () => {
                         filter: `drop-shadow(0 0 6px ${rarityColor}44)`,
                       }}
                     >
-                      {unit.class === 'Warrior' ? '⚔️' : unit.class === 'Mage' ? '🔮' : '🏹'}
+                      {unit.class === 'Ghost' ? '👻' : unit.class === 'Dragoon' ? '🤖' : '🦎'}
                     </div>
 
                     {/* 이름 */}

@@ -5,6 +5,11 @@ import ActionMenuOverlay from './components/game/hud/ActionMenuOverlay';
 import EscMenuModal from './components/game/modals/EscMenuModal';
 import ProbModal from './components/game/modals/ProbModal';
 import InventoryModal from './components/game/modals/InventoryModal';
+import UpgradeModal from './components/game/modals/UpgradeModal';
+import GachaModal from './components/game/modals/GachaModal';
+import ResultModal from './components/game/modals/ResultModal';
+import CodexModal from './components/game/modals/CodexModal';
+import RankingModal from './components/game/modals/RankingModal';
 import ChatOverlay from './components/chat/ChatOverlay';
 import BattleField from './features/combat/BattleField';
 import CustomCursor from './components/ui/CustomCursor';
@@ -37,6 +42,11 @@ const GameView: React.FC = () => {
       <EscMenuModal />
       <ProbModal />
       <InventoryModal />
+      <UpgradeModal />
+      <GachaModal />
+      <ResultModal />
+      <CodexModal />
+      <RankingModal />
     </div>
   );
 };
@@ -52,6 +62,10 @@ const App: React.FC = () => {
       {currentView === 'LOBBY' && <LobbyView />}
       {currentView === 'ROOM' && <RoomView />}
       {currentView === 'GAME' && <GameView />}
+
+      {/* 로비 및 전역 모달 */}
+      <CodexModal />
+      <RankingModal />
     </div>
   );
 };

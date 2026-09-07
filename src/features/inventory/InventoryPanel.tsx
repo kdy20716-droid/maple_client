@@ -6,15 +6,15 @@ import type { UnitRarity } from '../../types/game';
 // Tailwind 클래스로 변환하기 힘든 동적 컬러는 인라인 스타일로 처리하거나 매핑을 유지합니다.
 // 여기서는 기존 Tailwind 매핑 방식을 새로운 등급에 맞춰 업데이트합니다.
 const rarityTailwindStyles: Record<UnitRarity, string> = {
-  Normal: 'text-gray-700 border-gray-400 bg-[#e2d2ba]',
+  Common: 'text-gray-700 border-gray-400 bg-[#e2d2ba]',
   Rare: 'text-blue-700 border-blue-500 bg-blue-100',
-  Epic: 'text-purple-700 border-purple-500 bg-purple-100',
-  Unique: 'text-pink-700 border-pink-500 bg-pink-100',
+  Ancient: 'text-green-700 border-green-500 bg-green-100',
+  Artifact: 'text-pink-700 border-pink-500 bg-pink-100',
+  Narrative: 'text-purple-700 border-purple-500 bg-purple-100',
   Legendary: 'text-orange-600 border-orange-500 bg-orange-100 drop-shadow-[0_0_2px_rgba(255,255,255,1)]',
-  Hero: 'text-cyan-700 border-cyan-500 bg-cyan-100',
+  Epic: 'text-red-700 border-red-500 bg-red-100',
   Mythic: 'text-yellow-700 border-yellow-500 bg-yellow-100',
-  Primeval: 'text-red-700 border-red-500 bg-red-100',
-  Apocalypse: 'text-indigo-900 border-indigo-900 bg-indigo-200 shadow-[0_0_5px_rgba(0,0,0,0.3)]',
+  Primeval: 'text-cyan-700 border-cyan-500 bg-cyan-100 shadow-[0_0_8px_rgba(6,182,212,0.5)]',
 };
 
 const InventoryPanel: React.FC = () => {

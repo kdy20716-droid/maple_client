@@ -57,7 +57,7 @@ const MapBtn: React.FC<{
 };
 
 const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
-  const { gold, spendGold, upgrades, upgradeClass, isGameOver } = useGameStore();
+  const { mineral, gas, spendMineral, upgrades, upgradeClass, isGameOver, getUpgradeCost } = useGameStore();
   const { addUnit } = useUnitStore();
   const { addMessage } = useChatStore();
 
@@ -66,32 +66,39 @@ const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
 
   const handleGacha = () => {
     if (isGameOver || !isMyMap) return;
-    if (!spendGold(GACHA_COST)) {
-      addMessage('[경고] 골드가 부족합니다!', '#ff4444');
+    if (!spendMineral(GACHA_COST)) {
+      addMessage('[경고] 미네랄이 부족합니다!', '#ff4444');
       return;
     }
 
     const { rarity, unitClass } = rollGacha();
     const stats = getBaseStats(rarity, unitClass);
     const unitLabel = RARITY_LABELS[rarity];
-    const unitName = `${unitLabel} ${unitClass}`;
+    const unitClassName = unitClass === 'Ghost' ? '고스트' : unitClass === 'Dragoon' ? '드라군' : '히드라';
+    const unitName = `${unitLabel} ${unitClassName}`;
 
     const angle = Math.random() * Math.PI * 2;
     const dist = Math.random() * 40;
     addUnit({
-      id: generateId(), name: unitName, rarity, class: unitClass,
-      damage: stats.damage, attackSpeed: stats.attackSpeed, range: stats.range,
+      id: generateId(),
+      name: unitName,
+      rarity,
+      class: unitClass,
+      attackType: stats.attackType,
+      damage: stats.damage,
+      attackSpeed: stats.attackSpeed,
+      range: stats.range,
       position: { x: x + Math.cos(angle) * dist, y: y + Math.sin(angle) * dist },
     });
 
-    const special: UnitRarity[] = ['Legendary', 'Hero', 'Mythic', 'Primeval', 'Apocalypse'];
+    const special: UnitRarity[] = ['Legendary', 'Epic', 'Mythic', 'Primeval'];
     if (special.includes(rarity)) {
       const color = RARITY_COLORS[rarity];
       const sep = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
       addMessage(sep, color);
       addMessage(`[경축] 상위 등급 유닛이 탄생했습니다!`, color);
       addMessage(`▶▶ ★ ${unitLabel} ★ ◀◀`, color);
-      addMessage(`( ${unitClass} )`, color);
+      addMessage(`( ${unitClassName} )`, color);
       addMessage(sep, color);
     } else {
       addMessage(`[시스템] ${unitName} 획득!`, RARITY_COLORS[rarity]);
@@ -129,33 +136,33 @@ const MapControls: React.FC<MapControlsProps> = ({ x, y, playerIdx }) => {
         {/* 뽑기 버튼 */}
         <MapBtn
           onClick={handleGacha}
-          disabled={!isMyMap || gold < GACHA_COST}
-          color="#b07820"
+          disabled={!isMyMap || mineral < GACHA_COST}
+          color="#0284c7"
         >
-          🎲 뽑기 ({GACHA_COST}G)
+          💎 뽑기 ({GACHA_COST}M)
         </MapBtn>
 
-        {/* 강화 버튼들 */}
+        {/* 강화 버튼들 (가스 소모) */}
         <MapBtn
-          onClick={() => upgradeClass('Warrior')}
-          disabled={!isMyMap}
+          onClick={() => upgradeClass('Ghost')}
+          disabled={!isMyMap || gas < getUpgradeCost('Ghost')}
           color="#cc3030"
         >
-          ⚔ 전사 Lv.{upgrades.Warrior}
+          👻 고스트 Lv.{upgrades.Ghost} ({getUpgradeCost('Ghost')}G)
         </MapBtn>
         <MapBtn
-          onClick={() => upgradeClass('Mage')}
-          disabled={!isMyMap}
-          color="#8844cc"
+          onClick={() => upgradeClass('Dragoon')}
+          disabled={!isMyMap || gas < getUpgradeCost('Dragoon')}
+          color="#2563eb"
         >
-          🔮 마법 Lv.{upgrades.Mage}
+          🤖 드라군 Lv.{upgrades.Dragoon} ({getUpgradeCost('Dragoon')}G)
         </MapBtn>
         <MapBtn
-          onClick={() => upgradeClass('Archer')}
-          disabled={!isMyMap}
-          color="#229944"
+          onClick={() => upgradeClass('Hydra')}
+          disabled={!isMyMap || gas < getUpgradeCost('Hydra')}
+          color="#16a34a"
         >
-          🏹 궁수 Lv.{upgrades.Archer}
+          🦎 히드라 Lv.{upgrades.Hydra} ({getUpgradeCost('Hydra')}G)
         </MapBtn>
       </div>
     </div>
